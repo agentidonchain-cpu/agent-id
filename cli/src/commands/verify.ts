@@ -7,7 +7,7 @@ import chalk from 'chalk';
 import ora from 'ora';
 
 // Default contract address (Base Mainnet)
-const DEFAULT_CONTRACT = process.env.AGENTID_CONTRACT || '0x0000000000000000000000000000000000000000';
+const DEFAULT_CONTRACT = process.env.AGENTID_CONTRACT || '0x471C4c43672be2d49A2ceC79203c23b7194A22Fa';
 const DEFAULT_RPC = 'https://mainnet.base.org';
 
 interface VerifyOptions {

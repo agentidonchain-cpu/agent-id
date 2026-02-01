@@ -5,9 +5,14 @@
  */
 
 import { Command } from 'commander';
+import { init } from './commands/init.js';
 import { register } from './commands/register.js';
+import { anchor } from './commands/anchor.js';
 import { verify } from './commands/verify.js';
 import { proof } from './commands/proof.js';
+
+// Default contract address (Base Mainnet)
+const DEFAULT_CONTRACT = '0x471C4c43672be2d49A2ceC79203c23b7194A22Fa';
 
 const program = new Command();
 
@@ -15,6 +20,12 @@ program
   .name('agentid')
   .description('CLI for registering and verifying AI agent identities on-chain')
   .version('0.1.0');
+
+program
+  .command('init')
+  .description('Create agent.json config file')
+  .option('-f, --force', 'Overwrite existing file')
+  .action(init);
 
 program
   .command('register')
@@ -25,17 +36,25 @@ program
   .action(register);
 
 program
+  .command('anchor <identityHash>')
+  .description('Anchor an identity on-chain (Base Mainnet)')
+  .option('--rpc <url>', 'RPC endpoint', 'https://mainnet.base.org')
+  .option('--contract <address>', 'Contract address', DEFAULT_CONTRACT)
+  .option('--private-key <key>', 'Private key for signing')
+  .action(anchor);
+
+program
   .command('verify <identityHash>')
   .description('Verify an agent identity on-chain')
   .option('--rpc <url>', 'RPC endpoint', 'https://mainnet.base.org')
-  .option('--contract <address>', 'Contract address')
+  .option('--contract <address>', 'Contract address', DEFAULT_CONTRACT)
   .action(verify);
 
 program
   .command('proof <identityHash>')
   .description('Generate verification proof for an identity')
   .option('--rpc <url>', 'RPC endpoint', 'https://mainnet.base.org')
-  .option('--contract <address>', 'Contract address')
+  .option('--contract <address>', 'Contract address', DEFAULT_CONTRACT)
   .action(proof);
 
 program.parse();
