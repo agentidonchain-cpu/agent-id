@@ -2,7 +2,78 @@
 
 **Data:** 2026-02-01
 **Versão:** V1 Production + V2 Experimental (locked)
-**Último commit:** b6ed74c
+
+---
+
+## V1 LAUNCH STATUS
+
+| # | Item | Status | Detalhes |
+|---|------|--------|----------|
+| 1 | Smart Contract V1 | ✅ DEPLOYED | `0x471C4c43672be2d49A2ceC79203c23b7194A22Fa` |
+| 2 | Endereço no backend | ✅ DONE | `.env` atualizado |
+| 3 | Deploy backend | ⏳ READY | Dockerfile, Railway, Fly.io configs prontos |
+| 4 | CLI no npm | ✅ PUBLISHED | `npx agentidbase` |
+| 5 | Landing page | ❌ PENDING | Conteúdo em `docs/LANDING_CONTENT.md` |
+
+---
+
+## Contract V1 (Base Mainnet)
+
+```
+Address:  0x471C4c43672be2d49A2ceC79203c23b7194A22Fa
+Chain:    Base Mainnet (8453)
+Deployer: 0xBD707b0cbf2A204B287a25c42C59C0612eeE3293
+Basescan: https://basescan.org/address/0x471C4c43672be2d49A2ceC79203c23b7194A22Fa
+```
+
+---
+
+## CLI (npm)
+
+**Package:** https://www.npmjs.com/package/agentidbase
+
+```bash
+npx agentidbase init          # Cria agent.json
+npx agentidbase register      # Registra via API
+npx agentidbase anchor <hash> # Ancora on-chain
+npx agentidbase verify <hash> # Verifica on-chain
+npx agentidbase proof <hash>  # Gera proof
+```
+
+---
+
+## Deploy Backend
+
+Arquivos prontos:
+- `Dockerfile` - Multi-stage build
+- `docker-compose.yml` - Local com PostgreSQL + Redis
+- `railway.json` - Railway config
+- `fly.toml` - Fly.io config
+- `.env.production.example` - Template de variáveis
+- `DEPLOY.md` - Guia completo
+
+### Quick Deploy (Railway)
+```bash
+# Conectar GitHub repo ao Railway
+# Configurar secrets no dashboard
+# Deploy automático
+```
+
+### Quick Deploy (Fly.io)
+```bash
+fly launch
+fly secrets set DATABASE_URL="..." JWT_SECRET="..."
+fly deploy
+```
+
+---
+
+## Wallet
+
+```
+Address: 0xBD707b0cbf2A204B287a25c42C59C0612eeE3293
+Balance: ~0.02 ETH (Base)
+```
 
 ---
 
