@@ -1,6 +1,6 @@
 # AgentID
 
-**Cryptographic Identity for AI Agents**
+> 🔐 **Cryptographic Identity for AI Agents** — Deployed on Base Mainnet
 
 AgentID is an open-source system that provides cryptographic identities for AI agents. It creates immutable, verifiable proof that an agent's configuration has not been modified since registration.
 
