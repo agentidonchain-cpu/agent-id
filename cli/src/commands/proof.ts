@@ -42,7 +42,7 @@ export async function proof(identityHash: string, options: ProofOptions): Promis
   console.log();
 
   console.log(chalk.dim('Using curl (raw JSON-RPC):'));
-  const calldata = '0xdee1f0e4' + hash.slice(2).padStart(64, '0');
+  const calldata = '0xa7867212' + hash.slice(2).padStart(64, '0');
   console.log(chalk.white(`  curl -X POST ${options.rpc} \\`));
   console.log(chalk.white(`    -H "Content-Type: application/json" \\`));
   console.log(chalk.white(`    -d '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"${contractAddress}","data":"${calldata}"},"latest"]}'`));

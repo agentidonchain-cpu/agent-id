@@ -95,7 +95,7 @@ async function verifyOnChain(
 ): Promise<VerifyResult> {
   // Encode the function call: getIdentity(bytes32)
   // Function selector: 0x... (first 4 bytes of keccak256("getIdentity(bytes32)"))
-  const functionSelector = '0xdee1f0e4'; // getIdentity(bytes32)
+  const functionSelector = '0xa7867212'; // getIdentity(bytes32)
   const paddedHash = hash.slice(2).padStart(64, '0');
   const data = functionSelector + paddedHash;
 
