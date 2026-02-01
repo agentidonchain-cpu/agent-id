@@ -1,6 +1,9 @@
 # AgentID
 
-> 🔐 **Cryptographic Identity for AI Agents** — Deployed on Base Mainnet
+> 🔐 **Cryptographic Identity for AI Agents** — Live on Base Mainnet
+
+[![Contract](https://img.shields.io/badge/Contract-Verified-green)](https://basescan.org/address/0x471C4c43672be2d49A2ceC79203c23b7194A22Fa)
+[![npm](https://img.shields.io/npm/v/agentidbase)](https://www.npmjs.com/package/agentidbase)
 
 AgentID is an open-source system that provides cryptographic identities for AI agents. It creates immutable, verifiable proof that an agent's configuration has not been modified since registration.
 
