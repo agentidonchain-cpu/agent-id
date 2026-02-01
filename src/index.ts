@@ -19,7 +19,7 @@ import proxyRoutes from './routes/proxy.js';
 import websocketRoutes from './routes/websocket.js';
 import blockchainRoutes from './routes/blockchain.js';
 import { initializeDatabase, shutdownDatabase, verifySchema } from './config/init-db.js';
-import { getHealth as getDatabaseHealth } from './config/database.js';
+import { getHealth as getDatabaseHealth, query } from './config/database.js';
 import { getWebSocketService, resetWebSocketService } from './services/realtime/websocket.js';
 
 // =============================================================================
@@ -243,6 +243,29 @@ async function startServer() {
   const wsService = getWebSocketService();
   wsService.initialize(server);
 
+  // Set up real-time stats callback for website
+  if (databaseConnected) {
+    wsService.setStatsCallback(async () => {
+      try {
+        const [totalResult, anchoredResult] = await Promise.all([
+          query<{ count: string }>('SELECT COUNT(*) as count FROM agent_identities'),
+          query<{ count: string }>('SELECT COUNT(*) as count FROM agent_identities WHERE blockchain_tx_hash IS NOT NULL'),
+        ]);
+
+        return {
+          totalAgents: parseInt(totalResult.rows[0]?.count || '0'),
+          totalAnchored: parseInt(anchoredResult.rows[0]?.count || '0'),
+        };
+      } catch (error) {
+        logger.error({ error }, 'Failed to fetch stats for WebSocket');
+        return { totalAgents: 0, totalAnchored: 0 };
+      }
+    });
+
+    // Start broadcasting stats every 5 seconds
+    wsService.startStatsInterval(5000);
+  }
+
   server.listen(Number(PORT), HOST, () => {
     logger.info({
       port: PORT,
@@ -250,6 +273,7 @@ async function startServer() {
       env: process.env.NODE_ENV || 'development',
       database: databaseConnected ? 'connected' : 'offline',
       websocket: 'enabled',
+      realtimeStats: databaseConnected ? 'enabled' : 'disabled',
     }, 'Agent007 server started');
 
     console.log(`
@@ -291,7 +315,8 @@ async function startServer() {
 ║   • GET  /api/v1/blockchain/proof    - Get blockchain proof      ║
 ║                                                                  ║
 ║   WebSocket Events:                                              ║
-║   • agent.registered, agent.validated, agent.status_changed      ║
+║   • agent.registered, agent.validated, agent.anchored            ║
+║   • stats.update, visitor.count (real-time for website)          ║
 ║   • verification.completed, alert.created                        ║
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
