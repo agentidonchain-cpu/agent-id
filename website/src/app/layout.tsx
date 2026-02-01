@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AgentID - Cryptographic Identity for AI Agents",
     description: "Register, fingerprint and verify AI agents on-chain. No platform trust required.",
-    url: "https://agentid.xyz",
+    url: "https://id-agent.org",
     siteName: "AgentID",
     type: "website",
   },

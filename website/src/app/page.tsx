@@ -14,7 +14,7 @@ export default function Home() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch("https://api.agentid.xyz/api/v1/blockchain/stats");
+        const res = await fetch("https://api.id-agent.org/api/v1/blockchain/stats");
         const data = await res.json();
         if (data.data?.display) {
           setStats({
@@ -45,7 +45,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <span className="text-lg font-semibold tracking-tight">AgentID</span>
           <nav className="flex items-center gap-6 text-sm text-[#737373]">
-            <a href="https://docs.agentid.xyz" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Docs</a>
+            <a href="https://docs.id-agent.org" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Docs</a>
             <a href="https://github.com/agentidonchain-cpu/agent-id" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">GitHub</a>
             <a href="https://twitter.com/agentidxyz" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Twitter</a>
             <a href="https://medium.com/@agentid" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Medium</a>
@@ -62,10 +62,21 @@ export default function Home() {
           <p className="text-xl text-[#737373] mb-2">
             Cryptographic identity for AI agents.
           </p>
-          <p className="text-[#737373] max-w-xl">
+          <p className="text-[#737373] max-w-xl mb-6">
             Register, fingerprint and verify AI agents on-chain.<br />
             No platform trust required.
           </p>
+
+          {/* Why AgentID */}
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 max-w-xl">
+            <p className="text-sm text-[#a3a3a3] leading-relaxed">
+              <span className="text-[#e5e5e5] font-medium">Why AgentID?</span> As AI agents proliferate,
+              there&apos;s no standard way to verify their identity or authenticity. Anyone can claim
+              to be any agent. AgentID solves this by creating a cryptographic fingerprint of each
+              agent&apos;s configuration and anchoring it on-chain — providing immutable proof of
+              identity that anyone can verify, without trusting a central authority.
+            </p>
+          </div>
 
           {/* Live Stats */}
           {stats.totalAgents > 0 && (
@@ -211,7 +222,7 @@ export default function Home() {
           <h2 className="text-2xl font-semibold mb-8">Every agent has a public identity</h2>
 
           <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 mb-6">
-            <code className="text-[#737373] text-sm">https://agentid.xyz/agents/</code>
+            <code className="text-[#737373] text-sm">https://id-agent.org/agents/</code>
             <code className="text-[#22c55e] text-sm">0x7f83b166...</code>
           </div>
 
@@ -334,7 +345,7 @@ export default function Home() {
               <div className="text-[#737373] text-xs">Source code</div>
             </a>
             <a
-              href="https://docs.agentid.xyz"
+              href="https://docs.id-agent.org"
               target="_blank"
               rel="noopener noreferrer"
               className="border border-[#262626] rounded-lg p-4 hover:border-[#737373] transition-colors"
@@ -343,7 +354,7 @@ export default function Home() {
               <div className="text-[#737373] text-xs">API + CLI</div>
             </a>
             <a
-              href="https://gitbook.agentid.xyz"
+              href="https://docs.id-agent.org/gitbook"
               target="_blank"
               rel="noopener noreferrer"
               className="border border-[#262626] rounded-lg p-4 hover:border-[#737373] transition-colors"
@@ -375,10 +386,14 @@ export default function Home() {
               rel="noopener noreferrer"
               className="border border-[#262626] rounded-lg p-4 hover:border-[#737373] transition-colors"
             >
-              <div className="text-[#e5e5e5] mb-1">Contract</div>
-              <div className="text-[#737373] text-xs">Basescan</div>
+              <div className="text-[#e5e5e5] mb-1">Identity Registry</div>
+              <div className="text-[#737373] text-xs">On-chain ID contract</div>
             </a>
           </div>
+
+          <p className="text-xs text-[#525252] mt-6">
+            Note: The contract is an identity registry for anchoring agent fingerprints — not a token or currency.
+          </p>
         </section>
       </main>
 

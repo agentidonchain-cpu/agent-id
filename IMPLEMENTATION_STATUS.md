@@ -9,11 +9,12 @@
 
 | # | Item | Status | Detalhes |
 |---|------|--------|----------|
-| 1 | Smart Contract V1 | ✅ DEPLOYED | `0x471C4c43672be2d49A2ceC79203c23b7194A22Fa` |
+| 1 | Smart Contract V1 | ✅ DEPLOYED & VERIFIED | `0x471C4c43672be2d49A2ceC79203c23b7194A22Fa` |
 | 2 | Endereço no backend | ✅ DONE | `.env` atualizado |
 | 3 | Deploy backend | ⏳ READY | Dockerfile, Railway, Fly.io configs prontos |
 | 4 | CLI no npm | ✅ PUBLISHED | `npx agentidbase` |
 | 5 | Landing page | ✅ DONE | `website/` - Next.js |
+| 6 | Contrato verificado | ✅ DONE | Basescan verified |
 
 ---
 
@@ -24,7 +25,23 @@ Address:  0x471C4c43672be2d49A2ceC79203c23b7194A22Fa
 Chain:    Base Mainnet (8453)
 Deployer: 0xBD707b0cbf2A204B287a25c42C59C0612eeE3293
 Basescan: https://basescan.org/address/0x471C4c43672be2d49A2ceC79203c23b7194A22Fa
+Status:   ✅ VERIFIED
 ```
+
+### Testes On-Chain (2026-02-01)
+
+```
+Agente #1: 0xae99b2eeea2947e3bb47c15b68c24efa9ae2dfcc8def733a947a6cf4bb737d2d
+Agente #2: 0x89af1171a2a87b5487c8bfc3e7d8885938fc0e1083c4ab39edc754569218eadd
+
+Stats: anchored=2, revoked=0, active=2
+```
+
+Todas as funções testadas:
+- ✅ anchorIdentity()
+- ✅ verifyIdentity()
+- ✅ getIdentity()
+- ✅ getStats()
 
 ---
 

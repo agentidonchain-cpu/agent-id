@@ -10,6 +10,7 @@ import { register } from './commands/register.js';
 import { anchor } from './commands/anchor.js';
 import { verify } from './commands/verify.js';
 import { proof } from './commands/proof.js';
+import { qr } from './commands/qr.js';
 
 // Default contract address (Base Mainnet)
 const DEFAULT_CONTRACT = '0x471C4c43672be2d49A2ceC79203c23b7194A22Fa';
@@ -31,7 +32,7 @@ program
   .command('register')
   .description('Register a new agent identity')
   .option('-c, --config <path>', 'Path to agent config file (JSON)')
-  .option('--api <url>', 'API endpoint', 'https://api.agentid.xyz')
+  .option('--api <url>', 'API endpoint', 'https://api.id-agent.org')
   .option('--no-anchor', 'Skip blockchain anchoring')
   .action(register);
 
@@ -56,5 +57,13 @@ program
   .option('--rpc <url>', 'RPC endpoint', 'https://mainnet.base.org')
   .option('--contract <address>', 'Contract address', DEFAULT_CONTRACT)
   .action(proof);
+
+program
+  .command('qr <identityHash>')
+  .description('Generate QR code for agent verification')
+  .option('-o, --output <filename>', 'Output filename (default: agent-{hash}.png)')
+  .option('-s, --size <pixels>', 'QR code size in pixels', '512')
+  .option('-d, --dir <directory>', 'Output directory', process.cwd())
+  .action(qr);
 
 program.parse();
