@@ -200,10 +200,12 @@ export class LLMProxyService {
     if (request.includeAttestation) {
       try {
         const attestationService = getAttestationService();
-        const att = await attestationService.generateAttestation({
+        const att = await attestationService.createAttestation({
           identityHash: request.identityHash,
           type: AttestationType.PROXY_VERIFIED,
-          payload: {
+          trustLevel: TrustLevel.MEDIUM,
+          claim: 'Response verified through proxy',
+          data: {
             requestId,
             requestHash,
             responseHash,
@@ -222,8 +224,8 @@ export class LLMProxyService {
         attestation = {
           id: att.id,
           signature: att.signature,
-          issuedAt: att.issuedAt,
-          validUntil: att.validUntil,
+          issuedAt: att.validity.issuedAt,
+          validUntil: att.validity.validUntil,
           trustLevel: att.trustLevel,
         };
       } catch (error) {
@@ -422,7 +424,7 @@ export class LLMProxyService {
   /**
    * Verify an attestation
    */
-  async verifyAttestation(attestationId: string): Promise<{
+  async verifyAttestation(_attestationId: string): Promise<{
     valid: boolean;
     details?: {
       requestId: string;
@@ -432,26 +434,9 @@ export class LLMProxyService {
     };
     error?: string;
   }> {
-    try {
-      const attestationService = getAttestationService();
-      const result = await attestationService.verifyAttestation(attestationId);
-
-      if (result.valid) {
-        return {
-          valid: true,
-          details: {
-            requestId: result.attestation?.payload?.requestId,
-            identityHash: result.attestation?.identityHash || '',
-            issuedAt: result.attestation?.issuedAt || '',
-            trustLevel: result.attestation?.trustLevel || TrustLevel.LOW,
-          },
-        };
-      }
-
-      return { valid: false, error: result.error };
-    } catch (error) {
-      return { valid: false, error: (error as Error).message };
-    }
+    // TODO: Implement attestation lookup by ID
+    // For now, attestation verification requires the full attestation object
+    return { valid: false, error: 'Attestation lookup by ID not yet implemented' };
   }
 
   /**

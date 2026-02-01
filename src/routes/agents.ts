@@ -1134,11 +1134,11 @@ router.post(
           intervalMs: options.intervalMs,
           webhookUrl: options.webhookUrl,
           webhookSecret: options.webhookSecret,
-          baselineFingerprint,
+          baselineFingerprint: baselineFingerprint ?? undefined,
           config: options.checks || options.thresholds || options.autoSuspend !== undefined
             ? {
                 checks: options.checks,
-                thresholds: options.thresholds,
+                thresholds: options.thresholds as { identityIntegrity: number; behavioralDrift: number; autonomyScore: number; anomalyScore: number; } | undefined,
                 autoSuspend: options.autoSuspend,
                 maxConsecutiveFailures: options.maxConsecutiveFailures,
               }
@@ -1556,6 +1556,10 @@ router.put(
       // Create new baseline
       const baseline = fingerprintService.createFingerprint(samples, true);
 
+      if (!baseline) {
+        return res.status(400).json({ error: 'Could not create fingerprint from samples' });
+      }
+
       // Update in verification service
       const verificationService = getContinuousVerificationService(responseSamples);
       const updated = verificationService.updateBaseline(identityHash, baseline);
@@ -1565,7 +1569,7 @@ router.put(
         'Behavioral baseline updated'
       );
 
-      res.json({
+      return res.json({
         success: true,
         data: {
           message: 'Behavioral baseline updated',
@@ -1578,6 +1582,88 @@ router.put(
           timestamp: new Date().toISOString(),
         },
       });
+    } catch (error) {
+      return next(error);
+    }
+  }
+);
+
+/**
+ * GET /agents/:identityHash/qr
+ * Generate QR code for agent verification
+ */
+router.get(
+  '/:identityHash/qr',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { identityHash } = req.params;
+      const { format = 'png', size = '256' } = req.query;
+
+      if (!identityHash || !identityHashService.isValidHash(identityHash)) {
+        throw new ValidationError('Invalid identity hash format');
+      }
+
+      // Verify agent exists
+      const identity = await getStorage().getIdentity(identityHash);
+      if (!identity) {
+        throw new NotFoundError('Agent identity');
+      }
+
+      const QRCode = (await import('qrcode')).default;
+      const qrSize = parseInt(size as string, 10) || 256;
+      const verifyUrl = `https://id-agent.org/verify/${identityHash}`;
+
+      if (format === 'base64' || format === 'json') {
+        // Return base64 encoded image
+        const base64 = await QRCode.toDataURL(verifyUrl, {
+          width: qrSize,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#ffffff',
+          },
+          errorCorrectionLevel: 'H',
+        });
+
+        res.json({
+          success: true,
+          data: {
+            identityHash,
+            qrCode: base64,
+            url: verifyUrl,
+            size: qrSize,
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+      } else {
+        // Return PNG image directly
+        const buffer = await QRCode.toBuffer(verifyUrl, {
+          width: qrSize,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#ffffff',
+          },
+          errorCorrectionLevel: 'H',
+        });
+
+        res.set({
+          'Content-Type': 'image/png',
+          'Content-Length': buffer.length.toString(),
+          'Cache-Control': 'public, max-age=86400', // Cache for 24 hours
+          'X-Agent-Hash': identityHash,
+        });
+
+        res.send(buffer);
+      }
+
+      logger.info(
+        { identityHash, format, size: qrSize },
+        'QR code generated'
+      );
     } catch (error) {
       next(error);
     }

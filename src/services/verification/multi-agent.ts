@@ -548,7 +548,7 @@ export class MultiAgentVerificationService {
         identityHash: s.identityHash,
         score: s.overallScore,
         deviation: Math.abs(s.overallScore - scoreDistribution.mean) / scoreDistribution.stdDev,
-        direction: s.overallScore > scoreDistribution.mean ? 'above' : 'below' as const,
+        direction: (s.overallScore > scoreDistribution.mean ? 'above' : 'below') as 'above' | 'below',
       }));
 
     // Top performers (top 20% or top 5)

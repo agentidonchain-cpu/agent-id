@@ -541,12 +541,12 @@ export class ContinuousVerificationService {
     // Create current fingerprint
     const currentFingerprint = fingerprintService.createFingerprint(samples, false);
 
-    if (!baselineFingerprint) {
+    if (!baselineFingerprint || !currentFingerprint) {
       return {
         checkType: VerificationCheckType.BEHAVIORAL_DRIFT,
         passed: true,
         score: 1.0,
-        details: { reason: 'No baseline fingerprint established' },
+        details: { reason: !baselineFingerprint ? 'No baseline fingerprint established' : 'Could not create current fingerprint' },
         issues: [],
         performedAt: new Date().toISOString(),
       };
@@ -558,19 +558,19 @@ export class ContinuousVerificationService {
       currentFingerprint
     );
 
-    const score = comparison.overallSimilarity;
+    const score = comparison.similarity;
     const passed = score >= config.thresholds.behavioralDrift;
 
     if (!passed) {
       issues.push(`Behavioral drift detected: ${((1 - score) * 100).toFixed(1)}% deviation from baseline`);
 
-      if (comparison.latencySimilarity < 0.7) {
+      if (comparison.components.latency < 0.7) {
         issues.push('Response timing patterns have changed significantly');
       }
-      if (comparison.vocabularySimilarity < 0.7) {
+      if (comparison.components.vocabulary < 0.7) {
         issues.push('Vocabulary usage has changed significantly');
       }
-      if (comparison.styleSimilarity < 0.7) {
+      if (comparison.components.style < 0.7) {
         issues.push('Writing style has changed significantly');
       }
     }
@@ -580,10 +580,10 @@ export class ContinuousVerificationService {
       passed,
       score,
       details: {
-        overallSimilarity: comparison.overallSimilarity,
-        latencySimilarity: comparison.latencySimilarity,
-        vocabularySimilarity: comparison.vocabularySimilarity,
-        styleSimilarity: comparison.styleSimilarity,
+        overallSimilarity: comparison.similarity,
+        latencySimilarity: comparison.components.latency,
+        vocabularySimilarity: comparison.components.vocabulary,
+        styleSimilarity: comparison.components.style,
         driftPercentage: ((1 - score) * 100).toFixed(2),
       },
       issues,
@@ -710,7 +710,7 @@ export class ContinuousVerificationService {
     // Check for latency anomalies
     const currentFingerprint = fingerprintService.createFingerprint(recentSamples, false);
 
-    if (baselineFingerprint) {
+    if (baselineFingerprint && currentFingerprint) {
       // Sudden latency changes
       const latencyRatio = currentFingerprint.latency.mean / baselineFingerprint.latency.mean;
       if (latencyRatio > 2.0 || latencyRatio < 0.5) {

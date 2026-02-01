@@ -367,7 +367,14 @@ export class VerificationStorageService {
                   typeTokenRatio: dbFingerprint.type_token_ratio || 0,
                   topNgrams: dbFingerprint.top_ngrams || [],
                 } as any)
-              : undefined,
+              : ({ uniqueWordCount: 0, avgSentenceLength: 0, readabilityScore: 0, typeTokenRatio: 0, topNgrams: [] } as any),
+            style: {
+              emojiUsage: dbFingerprint.emoji_usage || 0,
+              punctuationPattern: dbFingerprint.punctuation_pattern || '',
+              capitalizationStyle: (dbFingerprint.capitalization_style as 'standard' | 'all_lower' | 'all_upper' | 'mixed') || 'standard',
+              formattingPreferences: dbFingerprint.formatting_preferences || [],
+              avgParagraphLength: dbFingerprint.avg_paragraph_length || 0,
+            },
             consistencyScore: Number(dbFingerprint.consistency_score),
             sampleSize: dbFingerprint.sample_size,
             isBaseline: dbFingerprint.is_baseline,

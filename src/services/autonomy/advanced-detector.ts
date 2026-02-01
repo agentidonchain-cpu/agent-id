@@ -653,7 +653,7 @@ export class MLPredictor {
       feature: c.feature,
       importance: c.importance,
       value: c.value,
-      direction: c.contribution > 0 ? 'supports_autonomous' : 'supports_human' as const,
+      direction: (c.contribution > 0 ? 'supports_autonomous' : 'supports_human') as 'supports_autonomous' | 'supports_human',
     }));
 
     // Anomaly score (based on extreme feature values)

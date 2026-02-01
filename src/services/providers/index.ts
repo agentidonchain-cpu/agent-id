@@ -183,25 +183,28 @@ const anthropicAdapter: ProviderAdapter = {
       throw new Error(`Anthropic API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     const latencyMs = Date.now() - startTime;
 
-    const content = data.content?.[0]?.text || '';
+    const contentArr = data.content as Array<{ text?: string }> | undefined;
+    const content = contentArr?.[0]?.text || '';
     const responseHash = createHash('sha256').update(content).digest('hex');
 
+    const usage = data.usage as { input_tokens?: number; output_tokens?: number } | undefined;
+
     return {
-      requestId: data.id || uuidv4(),
+      requestId: (data.id as string) || uuidv4(),
       content,
-      model: data.model,
+      model: data.model as string,
       usage: {
-        promptTokens: data.usage?.input_tokens || 0,
-        completionTokens: data.usage?.output_tokens || 0,
-        totalTokens: (data.usage?.input_tokens || 0) + (data.usage?.output_tokens || 0),
+        promptTokens: usage?.input_tokens || 0,
+        completionTokens: usage?.output_tokens || 0,
+        totalTokens: (usage?.input_tokens || 0) + (usage?.output_tokens || 0),
       },
       latencyMs,
       providerMetadata: {
-        stopReason: data.stop_reason,
-        type: data.type,
+        stopReason: data.stop_reason as string,
+        type: data.type as string,
       },
       responseHash,
       timestamp: new Date().toISOString(),
@@ -300,25 +303,28 @@ const openaiAdapter: ProviderAdapter = {
       throw new Error(`OpenAI API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     const latencyMs = Date.now() - startTime;
 
-    const content = data.choices?.[0]?.message?.content || '';
+    const choices = data.choices as Array<{ message?: { content?: string }; finish_reason?: string }> | undefined;
+    const content = choices?.[0]?.message?.content || '';
     const responseHash = createHash('sha256').update(content).digest('hex');
 
+    const usage = data.usage as { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+
     return {
-      requestId: data.id || uuidv4(),
+      requestId: (data.id as string) || uuidv4(),
       content,
-      model: data.model,
+      model: data.model as string,
       usage: {
-        promptTokens: data.usage?.prompt_tokens || 0,
-        completionTokens: data.usage?.completion_tokens || 0,
-        totalTokens: data.usage?.total_tokens || 0,
+        promptTokens: usage?.prompt_tokens || 0,
+        completionTokens: usage?.completion_tokens || 0,
+        totalTokens: usage?.total_tokens || 0,
       },
       latencyMs,
       providerMetadata: {
-        finishReason: data.choices?.[0]?.finish_reason,
-        systemFingerprint: data.system_fingerprint,
+        finishReason: choices?.[0]?.finish_reason,
+        systemFingerprint: data.system_fingerprint as string,
       },
       responseHash,
       timestamp: new Date().toISOString(),
@@ -424,25 +430,28 @@ const googleAdapter: ProviderAdapter = {
       throw new Error(`Google API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     const latencyMs = Date.now() - startTime;
 
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const candidates = data.candidates as Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string; safetyRatings?: unknown }> | undefined;
+    const content = candidates?.[0]?.content?.parts?.[0]?.text || '';
     const responseHash = createHash('sha256').update(content).digest('hex');
+
+    const usageMetadata = data.usageMetadata as { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | undefined;
 
     return {
       requestId: uuidv4(),
       content,
       model: request.modelId,
       usage: {
-        promptTokens: data.usageMetadata?.promptTokenCount || 0,
-        completionTokens: data.usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: data.usageMetadata?.totalTokenCount || 0,
+        promptTokens: usageMetadata?.promptTokenCount || 0,
+        completionTokens: usageMetadata?.candidatesTokenCount || 0,
+        totalTokens: usageMetadata?.totalTokenCount || 0,
       },
       latencyMs,
       providerMetadata: {
-        finishReason: data.candidates?.[0]?.finishReason,
-        safetyRatings: data.candidates?.[0]?.safetyRatings,
+        finishReason: candidates?.[0]?.finishReason,
+        safetyRatings: candidates?.[0]?.safetyRatings,
       },
       responseHash,
       timestamp: new Date().toISOString(),

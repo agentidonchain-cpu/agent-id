@@ -32,7 +32,7 @@ program
   .command('register')
   .description('Register a new agent identity')
   .option('-c, --config <path>', 'Path to agent config file (JSON)')
-  .option('--api <url>', 'API endpoint', 'https://api.id-agent.org')
+  .option('--api <url>', 'API endpoint', 'https://agent007-api-production.up.railway.app')
   .option('--no-anchor', 'Skip blockchain anchoring')
   .action(register);
 
