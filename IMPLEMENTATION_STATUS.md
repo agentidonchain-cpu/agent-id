@@ -13,7 +13,7 @@
 | 2 | Endereço no backend | ✅ DONE | `.env` atualizado |
 | 3 | Deploy backend | ⏳ READY | Dockerfile, Railway, Fly.io configs prontos |
 | 4 | CLI no npm | ✅ PUBLISHED | `npx agentidbase` |
-| 5 | Landing page | ❌ PENDING | Conteúdo em `docs/LANDING_CONTENT.md` |
+| 5 | Landing page | ✅ DONE | `website/` - Next.js |
 
 ---
 
