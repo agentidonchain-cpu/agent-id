@@ -29,6 +29,7 @@ export enum EventType {
   // Agent events
   AGENT_REGISTERED = 'agent.registered',
   AGENT_VALIDATED = 'agent.validated',
+  AGENT_ANCHORED = 'agent.anchored',
   AGENT_STATUS_CHANGED = 'agent.status_changed',
 
   // Verification events
@@ -47,6 +48,10 @@ export enum EventType {
   // System events
   SYSTEM_HEALTH = 'system.health',
   SYSTEM_STATS = 'system.stats',
+
+  // Public stats events (for website)
+  STATS_UPDATE = 'stats.update',
+  VISITOR_COUNT = 'visitor.count',
 }
 
 export interface WebSocketMessage {
@@ -82,6 +87,17 @@ export class WebSocketService {
   private readonly CHANNEL_ALERTS = 'alerts';
   private readonly CHANNEL_VERIFICATIONS = 'verifications';
   private readonly CHANNEL_SYSTEM = 'system';
+  private readonly CHANNEL_STATS = 'stats';  // Public stats for website
+  private readonly CHANNEL_VISITORS = 'visitors';  // Visitor count
+
+  // Stats tracking
+  private statsInterval: NodeJS.Timeout | null = null;
+  private lastStats: { totalAgents: number; totalAnchored: number } = { totalAgents: 0, totalAnchored: 0 };
+  private statsCallback: (() => Promise<{ totalAgents: number; totalAnchored: number }>) | null = null;
+
+  // Visitor tracking
+  private totalVisitors: number = 0;
+  private peakVisitors: number = 0;
 
   // ===========================================================================
   // INITIALIZATION
@@ -124,10 +140,14 @@ export class WebSocketService {
     };
 
     this.clients.set(clientId, client);
+    this.totalVisitors++;
 
     logger.info({ clientId, clientIp }, 'WebSocket client connected');
 
-    // Send welcome message
+    // Emit visitor count update
+    this.emitVisitorCount();
+
+    // Send welcome message with current stats
     this.sendToClient(client, {
       type: EventType.CONNECTED,
       timestamp: new Date().toISOString(),
@@ -139,8 +159,15 @@ export class WebSocketService {
           this.CHANNEL_ALERTS,
           this.CHANNEL_VERIFICATIONS,
           this.CHANNEL_SYSTEM,
-          'agent:{identityHash}', // Per-agent channel
+          this.CHANNEL_STATS,      // Public stats for website
+          this.CHANNEL_VISITORS,   // Visitor count
+          'agent:{identityHash}',  // Per-agent channel
         ],
+        currentStats: this.lastStats,
+        visitors: {
+          current: this.getVisitorCount(),
+          peak: this.peakVisitors,
+        },
       },
     });
 
@@ -167,6 +194,9 @@ export class WebSocketService {
     ws.on('close', () => {
       this.clients.delete(clientId);
       logger.info({ clientId }, 'WebSocket client disconnected');
+
+      // Emit visitor count update
+      this.emitVisitorCount();
     });
 
     // Handle errors
@@ -223,6 +253,37 @@ export class WebSocketService {
       },
     });
 
+    // Send current stats immediately when subscribing to stats channel
+    if (channel === this.CHANNEL_STATS) {
+      this.sendToClient(client, {
+        type: EventType.STATS_UPDATE,
+        timestamp: new Date().toISOString(),
+        data: {
+          totalAgents: this.lastStats.totalAgents,
+          totalAnchored: this.lastStats.totalAnchored,
+          lastUpdated: new Date().toISOString(),
+        },
+      });
+    }
+
+    // Send current visitor count when subscribing to visitors channel
+    if (channel === this.CHANNEL_VISITORS) {
+      this.sendToClient(client, {
+        type: EventType.VISITOR_COUNT,
+        timestamp: new Date().toISOString(),
+        data: {
+          current: this.getVisitorCount(),
+          peak: this.peakVisitors,
+          total: this.totalVisitors,
+        },
+      });
+    }
+
+    // Update visitor count (subscription to stats/visitors affects count)
+    if (channel === this.CHANNEL_STATS || channel === this.CHANNEL_VISITORS) {
+      this.emitVisitorCount();
+    }
+
     logger.debug({ clientId: client.id, channel }, 'Client subscribed to channel');
   }
 
@@ -240,6 +301,11 @@ export class WebSocketService {
         subscriptions: Array.from(client.subscriptions),
       },
     });
+
+    // Update visitor count when unsubscribing from stats/visitors
+    if (channel === this.CHANNEL_STATS || channel === this.CHANNEL_VISITORS) {
+      this.emitVisitorCount();
+    }
 
     logger.debug({ clientId: client.id, channel }, 'Client unsubscribed from channel');
   }
@@ -563,6 +629,140 @@ export class WebSocketService {
   }
 
   // ===========================================================================
+  // PUBLIC STATS (WEBSITE)
+  // ===========================================================================
+
+  /**
+   * Set callback to fetch stats from database
+   */
+  setStatsCallback(callback: () => Promise<{ totalAgents: number; totalAnchored: number }>): void {
+    this.statsCallback = callback;
+  }
+
+  /**
+   * Start broadcasting stats at regular interval
+   */
+  startStatsInterval(intervalMs: number = 5000): void {
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+    }
+
+    this.statsInterval = setInterval(async () => {
+      await this.broadcastStats();
+    }, intervalMs);
+
+    // Broadcast immediately
+    this.broadcastStats();
+
+    logger.info({ intervalMs }, 'Stats broadcast interval started');
+  }
+
+  /**
+   * Broadcast current stats to all subscribers
+   */
+  private async broadcastStats(): Promise<void> {
+    if (!this.statsCallback) {
+      return;
+    }
+
+    try {
+      const stats = await this.statsCallback();
+
+      // Only broadcast if stats changed
+      if (
+        stats.totalAgents !== this.lastStats.totalAgents ||
+        stats.totalAnchored !== this.lastStats.totalAnchored
+      ) {
+        this.lastStats = stats;
+
+        const message: WebSocketMessage = {
+          type: EventType.STATS_UPDATE,
+          timestamp: new Date().toISOString(),
+          data: {
+            totalAgents: stats.totalAgents,
+            totalAnchored: stats.totalAnchored,
+            lastUpdated: new Date().toISOString(),
+          },
+        };
+
+        this.broadcast(this.CHANNEL_STATS, message);
+
+        logger.debug({ stats }, 'Stats broadcast');
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to broadcast stats');
+    }
+  }
+
+  /**
+   * Emit stats update immediately (call after new agent registered)
+   */
+  async emitStatsUpdate(): Promise<void> {
+    await this.broadcastStats();
+  }
+
+  /**
+   * Emit agent anchored event (triggers stats update)
+   */
+  emitAgentAnchored(data: {
+    identityHash: string;
+    agentId?: string;
+    displayName: string;
+    anchoredAt: string;
+    txHash?: string;
+  }): void {
+    const message: WebSocketMessage = {
+      type: EventType.AGENT_ANCHORED,
+      timestamp: new Date().toISOString(),
+      data,
+      meta: { identityHash: data.identityHash },
+    };
+
+    this.broadcast(this.CHANNEL_ALL, message);
+    this.broadcast(this.CHANNEL_STATS, message);
+    this.broadcastToAgent(data.identityHash, message);
+
+    // Trigger immediate stats update
+    this.broadcastStats();
+  }
+
+  /**
+   * Get current visitor count (clients subscribed to stats channel)
+   */
+  getVisitorCount(): number {
+    let count = 0;
+    for (const client of this.clients.values()) {
+      if (client.subscriptions.has(this.CHANNEL_STATS) || client.subscriptions.has(this.CHANNEL_VISITORS)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /**
+   * Emit visitor count update
+   */
+  emitVisitorCount(): void {
+    const currentVisitors = this.getVisitorCount();
+
+    if (currentVisitors > this.peakVisitors) {
+      this.peakVisitors = currentVisitors;
+    }
+
+    const message: WebSocketMessage = {
+      type: EventType.VISITOR_COUNT,
+      timestamp: new Date().toISOString(),
+      data: {
+        current: currentVisitors,
+        peak: this.peakVisitors,
+        total: this.totalVisitors,
+      },
+    };
+
+    this.broadcast(this.CHANNEL_VISITORS, message);
+  }
+
+  // ===========================================================================
   // STATUS METHODS
   // ===========================================================================
 
@@ -580,6 +780,12 @@ export class WebSocketService {
     connectedClients: number;
     channels: Record<string, number>;
     uptime: number;
+    visitors: {
+      current: number;
+      peak: number;
+      total: number;
+    };
+    lastAgentStats: { totalAgents: number; totalAnchored: number };
   } {
     const channels: Record<string, number> = {};
 
@@ -593,6 +799,12 @@ export class WebSocketService {
       connectedClients: this.clients.size,
       channels,
       uptime: process.uptime(),
+      visitors: {
+        current: this.getVisitorCount(),
+        peak: this.peakVisitors,
+        total: this.totalVisitors,
+      },
+      lastAgentStats: this.lastStats,
     };
   }
 
@@ -603,6 +815,11 @@ export class WebSocketService {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
+    }
+
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+      this.statsInterval = null;
     }
 
     if (this.wss) {
