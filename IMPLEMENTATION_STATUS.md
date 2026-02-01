@@ -2,7 +2,7 @@
 
 **Data:** 2026-02-01
 **Versão:** V1 Production + V2 Experimental (locked)
-**Último commit:** 7435a28
+**Último commit:** b6ed74c
 
 ---
 
@@ -50,6 +50,83 @@ Retorna:
 ```
 
 Use `data.display.totalAgents` para o contador do site.
+
+---
+
+## WebSocket Real-Time (Website)
+
+**Endpoint:** `ws://api.agentid.xyz/ws`
+
+### Canais Disponíveis
+
+| Canal | Descrição |
+|-------|-----------|
+| `all` | Todos os eventos (default) |
+| `stats` | Stats públicos do site (totalAgents, totalAnchored) |
+| `visitors` | Contagem de visitantes em tempo real |
+| `alerts` | Alertas de verificação |
+| `verifications` | Eventos de verificação |
+| `system` | Health e stats do sistema |
+| `agent:{hash}` | Eventos específicos de um agente |
+
+### Mensagens
+
+**Conectar:**
+```javascript
+const ws = new WebSocket('ws://api.agentid.xyz/ws');
+ws.onopen = () => {
+  // Subscribe ao canal de stats
+  ws.send(JSON.stringify({ action: 'subscribe', channel: 'stats' }));
+};
+```
+
+**Stats Update (`stats.update`):**
+```json
+{
+  "type": "stats.update",
+  "timestamp": "2026-02-01T00:00:00.000Z",
+  "data": {
+    "totalAgents": 1234,
+    "totalAnchored": 1000,
+    "lastUpdated": "2026-02-01T00:00:00.000Z"
+  }
+}
+```
+
+**Visitor Count (`visitor.count`):**
+```json
+{
+  "type": "visitor.count",
+  "timestamp": "2026-02-01T00:00:00.000Z",
+  "data": {
+    "current": 42,
+    "peak": 150,
+    "total": 10000
+  }
+}
+```
+
+**Agent Anchored (`agent.anchored`):**
+```json
+{
+  "type": "agent.anchored",
+  "timestamp": "2026-02-01T00:00:00.000Z",
+  "data": {
+    "identityHash": "0x...",
+    "displayName": "My Agent",
+    "anchoredAt": "2026-02-01T00:00:00.000Z",
+    "txHash": "0x..."
+  }
+}
+```
+
+### Features
+
+- Stats broadcast a cada 5 segundos (configurável)
+- Stats enviados imediatamente ao subscrever no canal
+- Atualização instantânea quando novo agente é ancorado
+- Tracking de visitantes: current, peak, total
+- Ping/pong para manter conexão viva
 
 ---
 
@@ -122,6 +199,8 @@ Use `data.display.totalAgents` para o contador do site.
 - Identity hash verification (read-only)
 - Blockchain anchoring V1
 - API de consulta básica
+- WebSocket real-time stats e visitor tracking
+- Endpoint `/blockchain/stats` para contador
 
 ### O Que É Experimental
 - Todo o sistema V2 (agentId, versioning, roles)
