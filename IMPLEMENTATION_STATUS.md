@@ -1,7 +1,55 @@
 # Agent007 - Implementation Status
 
 **Data:** 2026-02-01
-**Versão:** Identity System Evolution v2
+**Versão:** V1 Production + V2 Experimental (locked)
+**Último commit:** 7435a28
+
+---
+
+## V2 Lockdown Status
+
+**Todos os endpoints V2 estão bloqueados por default.**
+
+Para habilitar (apenas desenvolvimento/teste):
+```bash
+ENABLE_V2_EXPERIMENTAL=true
+```
+
+Endpoints bloqueados:
+- `POST /blockchain/anchor-v2` → 404
+- `POST /blockchain/update-version` → 404
+- `GET /blockchain/versions/:agentId` → 404
+- `GET /blockchain/current-version/:agentId` → 404
+- `GET /blockchain/verify-v2/:identityHash` → 404
+- `GET /agents/by-agent-id/:agentId` → 404
+
+---
+
+## Website Counter Endpoint
+
+```
+GET /blockchain/stats
+```
+
+Retorna:
+```json
+{
+  "data": {
+    "onChain": {
+      "totalAnchored": 0,
+      "totalRevoked": 0,
+      "totalActive": 0
+    },
+    "display": {
+      "totalAgents": 0,
+      "chain": "Base Mainnet",
+      "contractAddress": "0x..."
+    }
+  }
+}
+```
+
+Use `data.display.totalAgents` para o contador do site.
 
 ---
 
