@@ -45,6 +45,60 @@ router.get(
 );
 
 /**
+ * GET /blockchain/stats
+ * Get registration statistics for website counter
+ * Returns: total anchored, total revoked, total active
+ */
+router.get(
+  '/stats',
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const blockchain = await getBlockchainService();
+      const status = await blockchain.getStatus();
+
+      // Also get count from database for pending/validating agents
+      const storage = getAgentStorageService();
+      const dbStats = await storage.getStats();
+
+      // Calculate validated count from byStatus
+      const validatedCount = dbStats?.byStatus?.validated || 0;
+      const pendingCount = (dbStats?.byStatus?.pending || 0) + (dbStats?.byStatus?.validating || 0);
+
+      res.json({
+        success: true,
+        data: {
+          // On-chain counts (source of truth for anchored)
+          onChain: {
+            totalAnchored: status.totalAnchored || 0,
+            totalRevoked: status.totalRevoked || 0,
+            totalActive: (status.totalAnchored || 0) - (status.totalRevoked || 0),
+          },
+          // Off-chain counts (includes pending/validating)
+          offChain: {
+            totalIdentities: dbStats?.identities || 0,
+            totalValidated: validatedCount,
+            totalPending: pendingCount,
+            byStatus: dbStats?.byStatus || {},
+          },
+          // Combined for display (website counter)
+          display: {
+            totalAgents: status.totalAnchored || validatedCount || 0,
+            chain: status.chainName,
+            contractAddress: status.contractAddress,
+          },
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /blockchain/anchor/:identityHash
  * Anchor an identity hash on-chain
  */
@@ -396,7 +450,16 @@ router.get(
 
 // =============================================================================
 // V2 ROUTES (with agentId and versioning)
+// EXPERIMENTAL - Hidden by default, enable with ENABLE_V2_EXPERIMENTAL=true
 // =============================================================================
+
+const v2Guard = (_req: Request, res: Response, next: NextFunction) => {
+  if (process.env.ENABLE_V2_EXPERIMENTAL !== 'true') {
+    res.status(404).end();
+    return;
+  }
+  next();
+};
 
 /**
  * POST /blockchain/anchor-v2
@@ -404,6 +467,7 @@ router.get(
  */
 router.post(
   '/anchor-v2',
+  v2Guard,
   apiKeyAuth,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -488,6 +552,7 @@ router.post(
  */
 router.post(
   '/update-version',
+  v2Guard,
   apiKeyAuth,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
@@ -571,6 +636,7 @@ router.post(
  */
 router.get(
   '/versions/:agentId',
+  v2Guard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { agentId } = req.params;
@@ -613,6 +679,7 @@ router.get(
  */
 router.get(
   '/current-version/:agentId',
+  v2Guard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { agentId } = req.params;
@@ -676,6 +743,7 @@ router.get(
  */
 router.get(
   '/verify-v2/:identityHash',
+  v2Guard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { identityHash } = req.params;

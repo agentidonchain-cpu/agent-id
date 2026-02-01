@@ -470,9 +470,19 @@ router.get(
 /**
  * GET /agents/by-agent-id/:agentId
  * Get agent by stable agentId
+ * EXPERIMENTAL - Hidden by default
  */
+const v2Guard = (_req: Request, res: Response, next: NextFunction) => {
+  if (process.env.ENABLE_V2_EXPERIMENTAL !== 'true') {
+    res.status(404).end();
+    return;
+  }
+  next();
+};
+
 router.get(
   '/by-agent-id/:agentId',
+  v2Guard,
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { agentId } = req.params;
