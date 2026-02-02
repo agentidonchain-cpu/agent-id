@@ -1,0 +1,40 @@
+{
+  "name": "@agentid/mcp-server",
+  "version": "1.0.0",
+  "description": "AgentID MCP Server - Identity verification tools for MCP-compatible agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "agentid-mcp": "dist/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "agentid",
+    "ai-agent",
+    "identity",
+    "attestation",
+    "openclaw"
+  ],
+  "author": "AgentID",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@agentid/runtime-sdk": "file:../runtime-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

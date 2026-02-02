@@ -1,0 +1,38 @@
+{
+  "name": "@agentid/elizaos-plugin",
+  "version": "1.0.0",
+  "description": "AgentID plugin for ElizaOS - Auto-registration and runtime attestation",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "elizaos",
+    "agentid",
+    "ai-agent",
+    "plugin",
+    "identity",
+    "attestation"
+  ],
+  "author": "AgentID",
+  "license": "MIT",
+  "peerDependencies": {
+    "@elizaos/core": ">=0.1.0"
+  },
+  "dependencies": {
+    "@agentid/runtime-sdk": "file:../runtime-sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
