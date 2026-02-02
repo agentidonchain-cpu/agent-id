@@ -21,6 +21,7 @@ import websocketRoutes from './routes/websocket.js';
 import blockchainRoutes from './routes/blockchain.js';
 import sessionsRoutes from './routes/sessions.js';
 import verifyRoutes from './routes/verify.js';
+import runtimeRoutes from './routes/runtime.js';
 import { initializeDatabase, shutdownDatabase, verifySchema } from './config/init-db.js';
 import { getHealth as getDatabaseHealth, query } from './config/database.js';
 import { getWebSocketService, resetWebSocketService } from './services/realtime/websocket.js';
@@ -198,6 +199,15 @@ app.get('/api/v1', (_req, res) => {
         twitterStatus: 'GET /api/v1/verify/twitter/:identityHash',
         challengeStatus: 'GET /api/v1/verify/twitter/challenge/:challengeId',
       },
+      runtime: {
+        challenge: 'POST /api/v1/runtime/challenge',
+        attest: 'POST /api/v1/runtime/attest',
+        status: 'GET /api/v1/runtime/status/:identityHash',
+        history: 'GET /api/v1/runtime/history/:identityHash',
+        verify: 'POST /api/v1/runtime/verify',
+        stats: 'GET /api/v1/runtime/stats',
+        hash: 'POST /api/v1/runtime/hash',
+      },
     },
   });
 });
@@ -228,6 +238,9 @@ app.use('/api/v1/sessions', sessionsRoutes);
 
 // Social verification routes (Twitter, etc.)
 app.use('/api/v1/verify', verifyRoutes);
+
+// Runtime Attestation Protocol (RAP) routes
+app.use('/api/v1/runtime', runtimeRoutes);
 
 // =============================================================================
 // ERROR HANDLING
