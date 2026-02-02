@@ -37,3 +37,4 @@ temp/
 *.key
 credentials.json
 secrets.json
+cli/agentid-keypair.json
