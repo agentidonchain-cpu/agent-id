@@ -7,6 +7,7 @@ const RPC_URL = "https://mainnet.base.org";
 const CHAIN = "Base Mainnet";
 const CHAIN_ID = "8453";
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://agent007-api-production.up.railway.app/ws";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://agent007-api-production.up.railway.app";
 
 // Types for WebSocket events
 interface AgentEvent {
@@ -118,13 +119,27 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch stats directly from blockchain (fallback)
+  // Fetch initial stats from API (faster than blockchain)
   useEffect(() => {
-    const fetchOnChainStats = async () => {
+    const fetchStats = async () => {
       try {
-        const data = "0xc59d4847"; // getStats() selector
+        // Try V2 API first
+        const response = await fetch(`${API_URL}/api/v2/agents/stats`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            setStats({
+              anchored: result.data.totalAnchored || result.data.totalAgents || 0,
+              active: result.data.totalAgents || 0,
+            });
+            setLastUpdate(new Date());
+            return;
+          }
+        }
 
-        const response = await fetch(RPC_URL, {
+        // Fallback to blockchain
+        const data = "0xc59d4847"; // getStats() selector
+        const rpcResponse = await fetch(RPC_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -135,24 +150,49 @@ export default function Home() {
           }),
         });
 
-        const result = await response.json();
-
-        if (result.result && result.result !== "0x") {
-          const hex = result.result.slice(2);
+        const rpcResult = await rpcResponse.json();
+        if (rpcResult.result && rpcResult.result !== "0x") {
+          const hex = rpcResult.result.slice(2);
           const anchored = parseInt(hex.slice(0, 64), 16);
           const active = parseInt(hex.slice(128, 192), 16);
-
           setStats({ anchored, active });
           setLastUpdate(new Date());
         }
       } catch {
-        // RPC not available, keep current stats
+        // API/RPC not available, keep current stats
       }
     };
 
-    fetchOnChainStats();
-    const interval = setInterval(fetchOnChainStats, 30000); // Update every 30s (WebSocket handles real-time)
+    fetchStats();
+    const interval = setInterval(fetchStats, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Fetch recent agents for live feed on mount
+  useEffect(() => {
+    const fetchRecentAgents = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/v2/agents/recent?limit=10`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && result.data) {
+            const agents: AgentEvent[] = result.data.map((agent: any) => ({
+              id: agent.identityHash + Date.now(),
+              type: 'registered' as const,
+              identityHash: agent.identityHash,
+              displayName: agent.displayName || 'Unknown Agent',
+              provider: agent.provider,
+              timestamp: new Date(agent.timestamp),
+            }));
+            setRecentAgents(agents);
+          }
+        }
+      } catch {
+        // Failed to fetch recent agents
+      }
+    };
+
+    fetchRecentAgents();
   }, []);
 
   // Connect WebSocket on mount

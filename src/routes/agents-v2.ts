@@ -46,6 +46,22 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
 
   if (isDbAvailable) {
     try {
+      // First, ensure the v2-api creator exists (using the system creator ID as fallback)
+      const creatorResult = await query<{ id: string }>(
+        `SELECT id FROM creators WHERE id = '00000000-0000-0000-0000-000000000001' LIMIT 1`
+      );
+
+      const creatorId = creatorResult.rows.length > 0
+        ? creatorResult.rows[0].id
+        : null;
+
+      if (!creatorId) {
+        logger.warn('No system creator found, using in-memory storage');
+        inMemoryIdentities.set(stored.identity.identityHash, stored);
+        return;
+      }
+
+      // Insert into agent_identities
       await query(
         `INSERT INTO agent_identities (
           id, identity_hash, creator_id, owner_address, status, created_at, validated_at
@@ -56,7 +72,7 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
         [
           stored.id,
           stored.identity.identityHash,
-          'v2-api',
+          creatorId,  // Use valid creator ID
           stored.identity.signature.publicKey || null,
           stored.status,
           stored.createdAt,
@@ -65,6 +81,7 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
       );
 
       // Store full V2 data in metadata table as JSONB
+      // Use the stored.id (which was just inserted into agent_identities.id)
       await query(
         `INSERT INTO agent_metadata (id, agent_id, display_name, bio, tags)
          VALUES ($1, $2, $3, $4, $5)
@@ -81,8 +98,8 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
       );
 
       logger.info({ identityHash: stored.identity.identityHash.slice(0, 16) }, 'V2 identity saved to database');
-    } catch (error) {
-      logger.error({ error }, 'Failed to save V2 identity to database, using in-memory');
+    } catch (error: any) {
+      logger.error({ error: error.message, stack: error.stack }, 'Failed to save V2 identity to database, using in-memory');
       inMemoryIdentities.set(stored.identity.identityHash, stored);
     }
   } else {
@@ -165,44 +182,56 @@ async function getAllIdentities(
 
   if (isDbAvailable) {
     try {
-      // Get V2 identities - those created by v2-api
+      // Get V2 identities - identify them by having a valid JSON bio with identityType
       const offset = (page - 1) * pageSize;
-      const result = await query<{ bio: string }>(
-        `SELECT m.bio FROM agent_metadata m
-         JOIN agent_identities i ON i.id = m.agent_id
-         WHERE i.creator_id = $1 AND i.status != $2
+
+      // Query all identities that have metadata with bio containing V2 structure
+      const result = await query<{ bio: string | null; identity_hash: string; created_at: string }>(
+        `SELECT m.bio, i.identity_hash, i.created_at FROM agent_identities i
+         JOIN agent_metadata m ON i.id = m.agent_id
+         WHERE i.status != $1
+           AND m.bio IS NOT NULL
+           AND m.bio::text LIKE '%"identityType"%'
          ORDER BY i.created_at DESC
-         LIMIT $3 OFFSET $4`,
-        ['v2-api', 'revoked', pageSize, offset]
+         LIMIT $2 OFFSET $3`,
+        ['revoked', pageSize, offset]
       );
 
-      const items = result.rows
-        .filter(row => row.bio)
-        .map(row => {
+      logger.debug({ rowCount: result.rows.length }, 'V2 identities query result');
+
+      const items: StoredIdentityV2[] = [];
+
+      for (const row of result.rows) {
+        if (row.bio) {
           try {
             const parsed = JSON.parse(row.bio);
             // Verify it's a V2 structure
             if (parsed.identity && parsed.identity.identityType) {
-              return parsed as StoredIdentityV2;
+              items.push(parsed as StoredIdentityV2);
             }
-            return null;
-          } catch {
-            return null;
+          } catch (e) {
+            logger.warn({ hash: row.identity_hash, error: e }, 'Failed to parse V2 identity JSON');
           }
-        })
-        .filter((item): item is StoredIdentityV2 => item !== null);
+        }
+      }
 
       // Filter by identity type if specified
       const filtered = filter?.identityType
         ? items.filter(i => i.identity.identityType === filter.identityType)
         : items;
 
-      // Count only V2 agents
+      // Count V2 agents (those with bio containing identityType)
       const countResult = await query<{ count: string }>(
-        'SELECT COUNT(*) as count FROM agent_identities WHERE creator_id = $1 AND status != $2',
-        ['v2-api', 'revoked']
+        `SELECT COUNT(*) as count FROM agent_identities i
+         JOIN agent_metadata m ON i.id = m.agent_id
+         WHERE i.status != $1
+           AND m.bio IS NOT NULL
+           AND m.bio::text LIKE '%"identityType"%'`,
+        ['revoked']
       );
       const total = parseInt(countResult.rows[0]?.count || '0');
+
+      logger.debug({ itemsCount: filtered.length, total }, 'V2 identities returned');
 
       return { items: filtered, total };
     } catch (error) {
@@ -1069,21 +1098,139 @@ router.get(
         pageSize
       );
 
+      // Map to response format with all fields the website needs
       res.json({
         success: true,
-        data: paged.map((s) => ({
-          identityHash: s.identity.identityHash,
-          identityType: s.identity.identityType,
-          agentName: s.identity.agentName,
-          trustScore: s.trustScore,
-          trustDescription: getTrustDescription(s.identity),
-          createdAt: s.createdAt,
-        })),
+        data: paged.map((s) => {
+          const identity = s.identity;
+          const base: Record<string, unknown> = {
+            identityHash: identity.identityHash,
+            identityType: identity.identityType,
+            agentName: identity.agentName,
+            displayName: identity.agentName,
+            trustScore: s.trustScore,
+            trustDescription: getTrustDescription(identity),
+            createdAt: s.createdAt,
+            validatedAt: s.createdAt,
+          };
+
+          // Add type-specific fields
+          if (identity.identityType === IdentityType.ATTESTATION) {
+            base.platform = identity.platform;
+            base.tags = identity.tags || [];
+          } else if (identity.identityType === IdentityType.FINGERPRINT) {
+            base.model = identity.model;
+            base.platform = identity.model.provider;
+          } else if (identity.identityType === IdentityType.SELF_CLAIM) {
+            base.platform = 'autonomous';
+          }
+
+          return base;
+        }),
         pagination: {
           page,
           pageSize,
           totalItems: total,
           totalPages: Math.ceil(total / pageSize),
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =============================================================================
+// ROUTE: GET /agents/recent (for live feed)
+// =============================================================================
+
+router.get(
+  '/recent',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+
+      const { items } = await getAllIdentities(undefined, 1, limit);
+
+      res.json({
+        success: true,
+        data: items.map((s) => {
+          const identity = s.identity;
+          return {
+            identityHash: identity.identityHash,
+            displayName: identity.agentName,
+            provider: identity.identityType === IdentityType.FINGERPRINT
+              ? (identity as FingerprintIdentity).model.provider
+              : identity.identityType === IdentityType.ATTESTATION
+                ? (identity as AttestationIdentity).platform
+                : 'autonomous',
+            type: 'registered',
+            timestamp: s.createdAt,
+          };
+        }),
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =============================================================================
+// ROUTE: GET /agents/stats (for homepage counter)
+// =============================================================================
+
+router.get(
+  '/stats',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const isDbAvailable = await checkConnection();
+      let totalAgents = 0;
+      let totalAnchored = 0;
+
+      if (isDbAvailable) {
+        // Count all agents (V1 + V2)
+        const countResult = await query<{ count: string }>(
+          'SELECT COUNT(*) as count FROM agent_identities WHERE status != $1',
+          ['revoked']
+        );
+        totalAgents = parseInt(countResult.rows[0]?.count || '0');
+
+        // Count anchored agents
+        const anchoredResult = await query<{ count: string }>(
+          'SELECT COUNT(*) as count FROM agent_identities WHERE blockchain_tx_hash IS NOT NULL',
+          []
+        );
+        totalAnchored = parseInt(anchoredResult.rows[0]?.count || '0');
+
+        // If no anchored count from DB, use in-memory count + check for anchored V2
+        if (totalAnchored === 0) {
+          // Count V2 agents with anchor data in bio
+          const v2AnchoredResult = await query<{ count: string }>(
+            `SELECT COUNT(*) as count FROM agent_metadata WHERE bio::text LIKE '%"anchor":%'`,
+            []
+          );
+          totalAnchored = parseInt(v2AnchoredResult.rows[0]?.count || '0');
+        }
+      } else {
+        // In-memory fallback
+        totalAgents = inMemoryIdentities.size;
+        totalAnchored = Array.from(inMemoryIdentities.values()).filter(i => i.anchor).length;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          totalAgents,
+          totalAnchored: totalAnchored || totalAgents, // Fallback to totalAgents if no anchored count
+          totalActive: totalAgents,
         },
         meta: {
           requestId: uuidv4(),
