@@ -18,6 +18,8 @@ import multiAgentRoutes from './routes/multi-agent.js';
 import proxyRoutes from './routes/proxy.js';
 import websocketRoutes from './routes/websocket.js';
 import blockchainRoutes from './routes/blockchain.js';
+import sessionsRoutes from './routes/sessions.js';
+import verifyRoutes from './routes/verify.js';
 import { initializeDatabase, shutdownDatabase, verifySchema } from './config/init-db.js';
 import { getHealth as getDatabaseHealth, query } from './config/database.js';
 import { getWebSocketService, resetWebSocketService } from './services/realtime/websocket.js';
@@ -181,6 +183,12 @@ app.get('/api/v1', (_req, res) => {
         revoke: 'POST /api/v1/blockchain/revoke/:identityHash',
         estimate: 'GET /api/v1/blockchain/estimate/:identityHash',
       },
+      socialVerification: {
+        twitterInit: 'POST /api/v1/verify/twitter/init',
+        twitterConfirm: 'POST /api/v1/verify/twitter/confirm',
+        twitterStatus: 'GET /api/v1/verify/twitter/:identityHash',
+        challengeStatus: 'GET /api/v1/verify/twitter/challenge/:challengeId',
+      },
     },
   });
 });
@@ -202,6 +210,12 @@ app.use('/api/v1/ws', websocketRoutes);
 
 // Blockchain routes
 app.use('/api/v1/blockchain', blockchainRoutes);
+
+// Sessions routes (for browser signing)
+app.use('/api/v1/sessions', sessionsRoutes);
+
+// Social verification routes (Twitter, etc.)
+app.use('/api/v1/verify', verifyRoutes);
 
 // =============================================================================
 // ERROR HANDLING

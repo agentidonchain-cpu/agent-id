@@ -19,6 +19,8 @@ import { AttestationType, TrustLevel, VerificationCheckType, AlertSeverity } fro
 import { apiKeyAuth, type AuthenticatedRequest } from '../middleware/auth.js';
 import { ValidationError, NotFoundError, ConflictError } from '../middleware/errorHandler.js';
 import { logger } from '../utils/logger.js';
+import { verifyConfigSignature, verifyAttestationSignature, generateConfigMessage } from '../services/security/signature.js';
+import { computeAttestationHash } from '../types/attestation.js';
 import {
   ModelProvider,
   IdentityStatus,
@@ -278,6 +280,317 @@ router.post(
 );
 
 /**
+ * POST /agents/register/config
+ * Register a new ConfigIdentity with wallet signature (V1 flow)
+ * This is the simplified registration for AgentID V1
+ */
+const configIdentitySchema = z.object({
+  config: z.object({
+    name: z.string().min(1).max(100).optional(),
+    description: z.string().max(1000).optional(),
+    systemPrompt: z.string().min(1).max(100000),
+    model: z.object({
+      provider: z.string().min(1),
+      modelId: z.string().min(1),
+    }),
+    parameters: z.object({
+      temperature: z.number().min(0).max(2),
+      maxTokens: z.number().int().min(1).max(128000),
+    }),
+    tools: z.array(z.object({
+      name: z.string(),
+      description: z.string(),
+      parameters: z.record(z.unknown()).optional(),
+    })).optional(),
+  }),
+  identityHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid identity hash format'),
+  signature: z.string().regex(/^0x[a-fA-F0-9]+$/, 'Invalid signature format'),
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid wallet address'),
+  timestamp: z.string().datetime(),
+  storeConfig: z.boolean().optional().default(false),
+});
+
+router.post(
+  '/register/config',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const parseResult = configIdentitySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        throw new ValidationError('Invalid request body', parseResult.error.flatten());
+      }
+
+      const { config, identityHash, signature, walletAddress, timestamp, storeConfig } = parseResult.data;
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', walletAddress },
+        'ConfigIdentity registration started'
+      );
+
+      // Verify the signature
+      const verifyResult = await verifyConfigSignature(
+        identityHash,
+        timestamp,
+        signature,
+        walletAddress
+      );
+
+      if (!verifyResult.valid) {
+        logger.warn(
+          { identityHash, walletAddress, error: verifyResult.error },
+          'Signature verification failed'
+        );
+        throw new ValidationError(`Signature verification failed: ${verifyResult.error}`);
+      }
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', walletAddress },
+        'Signature verified successfully'
+      );
+
+      // Check if identity already exists
+      if (await getStorage().identityExists(identityHash)) {
+        throw new ConflictError('An agent with this identity hash already exists');
+      }
+
+      // Create core identity structure
+      const agentCore: AgentCoreIdentity = {
+        systemPrompt: {
+          content: config.systemPrompt,
+          hash: identityHashService.hashSystemPrompt(config.systemPrompt),
+          version: '1.0',
+          createdAt: new Date().toISOString(),
+        },
+        model: {
+          provider: config.model.provider as ModelProvider,
+          modelId: config.model.modelId,
+          apiKeyHash: '', // Not stored for V1 config identity
+          apiEndpoint: '',
+          authMethod: 'bearer',
+        },
+        parameters: {
+          temperature: config.parameters.temperature,
+          maxTokens: config.parameters.maxTokens,
+        },
+        tools: config.tools?.map(t => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters as any || { type: 'object', properties: {} },
+          hash: identityHashService.hashTool(t as any),
+        })) || [],
+      };
+
+      // Create metadata
+      const metadata: AgentMetadata = {
+        displayName: config.name || 'Unnamed Agent',
+        bio: config.description,
+        tags: [],
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Store identity
+      const identity: StoredIdentity = {
+        id: uuidv4(),
+        identityHash,
+        creatorId: walletAddress, // Owner is the wallet that signed
+        status: IdentityStatus.VALIDATED, // Signature = validation
+        agentCore,
+        metadata,
+        createdAt: new Date(),
+        validatedAt: new Date(),
+        ownerAddress: walletAddress, // Store owner address
+        signature, // Store signature
+        signedAt: timestamp,
+      };
+
+      await getStorage().saveIdentity(identity);
+
+      logger.info(
+        {
+          identityHash: identityHash.slice(0, 10) + '...',
+          walletAddress,
+          storedConfig: storeConfig,
+        },
+        'ConfigIdentity registered successfully'
+      );
+
+      // Return success response
+      res.status(201).json({
+        success: true,
+        data: {
+          identityHash,
+          identityType: 'config',
+          owner: walletAddress,
+          registeredAt: new Date().toISOString(),
+          verifyUrl: `https://id-agent.org/verify/${identityHash}`,
+          status: 'validated',
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
+ * POST /agents/register/attestation
+ * Register a new AttestationIdentity for closed platforms (V1 flow)
+ */
+const attestationIdentitySchema = z.object({
+  platform: z.string().min(1).max(100),
+  agentIdentifier: z.string().min(1).max(500),
+  declaredName: z.string().min(1).max(100),
+  declaredCapabilities: z.array(z.string()).optional().default([]),
+  identityHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/, 'Invalid identity hash format'),
+  signature: z.string().regex(/^0x[a-fA-F0-9]+$/, 'Invalid signature format'),
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, 'Invalid wallet address'),
+  timestamp: z.string().datetime(),
+});
+
+router.post(
+  '/register/attestation',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Validate request body
+      const parseResult = attestationIdentitySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        throw new ValidationError('Invalid request body', parseResult.error.flatten());
+      }
+
+      const {
+        platform,
+        agentIdentifier,
+        declaredName,
+        declaredCapabilities,
+        identityHash,
+        signature,
+        walletAddress,
+        timestamp,
+      } = parseResult.data;
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', platform, walletAddress },
+        'AttestationIdentity registration started'
+      );
+
+      // Verify the signature
+      const verifyResult = await verifyAttestationSignature(
+        {
+          identityHash,
+          platform,
+          agentIdentifier,
+          declaredName,
+          timestamp,
+        },
+        signature,
+        walletAddress
+      );
+
+      if (!verifyResult.valid) {
+        logger.warn(
+          { identityHash, walletAddress, error: verifyResult.error },
+          'Attestation signature verification failed'
+        );
+        throw new ValidationError(`Signature verification failed: ${verifyResult.error}`);
+      }
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', walletAddress },
+        'Attestation signature verified successfully'
+      );
+
+      // Check if identity already exists
+      if (await getStorage().identityExists(identityHash)) {
+        throw new ConflictError('An attestation with this identity hash already exists');
+      }
+
+      // Create attestation identity structure
+      const agentCore: AgentCoreIdentity = {
+        systemPrompt: {
+          content: `[ATTESTATION] ${declaredName} on ${platform}`,
+          hash: identityHashService.hashSystemPrompt(`attestation:${platform}:${agentIdentifier}`),
+          version: '1.0',
+          createdAt: new Date().toISOString(),
+        },
+        model: {
+          provider: platform as ModelProvider,
+          modelId: 'attestation',
+          apiKeyHash: '',
+          apiEndpoint: '',
+          authMethod: 'bearer',
+        },
+        parameters: {
+          temperature: 0,
+          maxTokens: 0,
+        },
+        tools: [],
+      };
+
+      // Create metadata
+      const metadata: AgentMetadata = {
+        displayName: declaredName,
+        bio: `Attestation for ${platform} agent: ${agentIdentifier}`,
+        tags: ['attestation', platform, ...declaredCapabilities],
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Store identity
+      const identity: StoredIdentity = {
+        id: uuidv4(),
+        identityHash,
+        creatorId: walletAddress,
+        status: IdentityStatus.VALIDATED,
+        agentCore,
+        metadata,
+        createdAt: new Date(),
+        validatedAt: new Date(),
+        ownerAddress: walletAddress,
+        signature,
+        signedAt: timestamp,
+      };
+
+      await getStorage().saveIdentity(identity);
+
+      logger.info(
+        {
+          identityHash: identityHash.slice(0, 10) + '...',
+          platform,
+          walletAddress,
+        },
+        'AttestationIdentity registered successfully'
+      );
+
+      // Return success response
+      res.status(201).json({
+        success: true,
+        data: {
+          identityHash,
+          identityType: 'attestation',
+          platform,
+          agentIdentifier,
+          declaredName,
+          owner: walletAddress,
+          registeredAt: new Date().toISOString(),
+          verifyUrl: `https://id-agent.org/verify/${identityHash}`,
+          status: 'attested',
+          note: 'This is an attestation, not a verified configuration.',
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /agents/validate
  * Submit challenge responses for validation
  */
@@ -430,10 +743,14 @@ router.get(
         throw new ValidationError('Invalid identity hash format');
       }
 
-      const identity = await getStorage().getIdentity(identityHash);
+      const storage = getStorage();
+      const identity = await storage.getIdentity(identityHash);
       if (!identity) {
         throw new NotFoundError('Agent identity');
       }
+
+      // Get verifications
+      const verifications = await storage.getVerifications(identityHash);
 
       // Return public information only
       res.json({
@@ -455,6 +772,8 @@ router.get(
           roles: identity.roles,
           createdAt: identity.createdAt.toISOString(),
           validatedAt: identity.validatedAt?.toISOString(),
+          // Include verifications if any exist
+          verifications: verifications || undefined,
         },
         meta: {
           requestId: uuidv4(),

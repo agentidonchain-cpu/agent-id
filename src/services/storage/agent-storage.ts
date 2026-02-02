@@ -38,6 +38,19 @@ export interface StoredRegistration {
   expiresAt: Date;
 }
 
+/**
+ * Twitter verification data
+ */
+export interface TwitterVerificationData {
+  type: 'twitter';
+  handle: string;
+  userId: string;
+  tweetId: string;
+  verifiedAt: string;
+  proofUrl: string;
+  challengeCode: string;
+}
+
 export interface StoredIdentity {
   id: string;
   identityHash: string;
@@ -57,6 +70,14 @@ export interface StoredIdentity {
   validatedAt?: Date;
   suspendedAt?: Date;
   revokedAt?: Date;
+  // V1 Signature fields
+  ownerAddress?: string;
+  signature?: string;
+  signedAt?: string;
+  // Social verifications
+  verifications?: {
+    twitter?: TwitterVerificationData;
+  };
 }
 
 // =============================================================================
@@ -474,6 +495,103 @@ export class AgentStorageService {
       suspendedAt: dbAgent.identity.suspended_at,
       revokedAt: dbAgent.identity.revoked_at,
     };
+  }
+
+  // ===========================================================================
+  // TWITTER VERIFICATION OPERATIONS
+  // ===========================================================================
+
+  /**
+   * Save Twitter verification for an identity
+   */
+  async saveTwitterVerification(
+    identityHash: string,
+    verification: TwitterVerificationData
+  ): Promise<boolean> {
+    // Update memory
+    const identity = this.identities.get(identityHash);
+    if (identity) {
+      if (!identity.verifications) {
+        identity.verifications = {};
+      }
+      identity.verifications.twitter = verification;
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', handle: verification.handle },
+        'Twitter verification saved to memory'
+      );
+    }
+
+    // TODO: Persist to database if available
+    // For now, just use memory storage
+    if (this.dbAvailable) {
+      try {
+        // Database persistence would go here
+        // await agentRepo.saveTwitterVerification(identityHash, verification);
+        logger.info(
+          { identityHash: identityHash.slice(0, 10) + '...' },
+          'Twitter verification would be persisted to database'
+        );
+      } catch (error) {
+        logger.error({ error, identityHash }, 'Failed to persist Twitter verification to database');
+      }
+    }
+
+    return identity !== undefined;
+  }
+
+  /**
+   * Get Twitter verification for an identity
+   */
+  async getTwitterVerification(identityHash: string): Promise<TwitterVerificationData | null> {
+    // Check memory first
+    const identity = this.identities.get(identityHash);
+    if (identity?.verifications?.twitter) {
+      return identity.verifications.twitter;
+    }
+
+    // TODO: Check database if available
+    // For now, just use memory storage
+
+    return null;
+  }
+
+  /**
+   * Get all verifications for an identity
+   */
+  async getVerifications(identityHash: string): Promise<{
+    wallet?: { address: string; verified: boolean; verifiedAt?: string };
+    twitter?: TwitterVerificationData & { verified: boolean; note: string };
+  } | null> {
+    const identity = await this.getIdentity(identityHash);
+    if (!identity) {
+      return null;
+    }
+
+    const verifications: {
+      wallet?: { address: string; verified: boolean; verifiedAt?: string };
+      twitter?: TwitterVerificationData & { verified: boolean; note: string };
+    } = {};
+
+    // Wallet verification (from signature)
+    if (identity.ownerAddress) {
+      verifications.wallet = {
+        address: identity.ownerAddress,
+        verified: true,
+        verifiedAt: identity.signedAt,
+      };
+    }
+
+    // Twitter verification
+    if (identity.verifications?.twitter) {
+      verifications.twitter = {
+        ...identity.verifications.twitter,
+        verified: true,
+        note: 'Verification snapshot. Tweet may have been deleted.',
+      };
+    }
+
+    return verifications;
   }
 
   /**

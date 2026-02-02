@@ -10,6 +10,7 @@ export {
   resetAgentStorageService,
   type StoredRegistration,
   type StoredIdentity,
+  type TwitterVerificationData,
 } from './agent-storage.js';
 
 export {
