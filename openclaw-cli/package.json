@@ -1,0 +1,44 @@
+{
+  "name": "agentid-openclaw",
+  "version": "1.0.0",
+  "description": "AgentID CLI for OpenClaw - Register your OpenClaw agents on AgentID",
+  "main": "dist/index.js",
+  "bin": {
+    "agentid-openclaw": "./dist/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "keywords": [
+    "agentid",
+    "openclaw",
+    "ai-agents",
+    "identity",
+    "blockchain",
+    "base"
+  ],
+  "author": "AgentID",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agentidonchain-cpu/agent-id.git",
+    "directory": "openclaw-cli"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "ora": "^8.0.1",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
