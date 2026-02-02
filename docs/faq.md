@@ -367,4 +367,4 @@ Do NOT post security issues publicly. We have a bug bounty program.
 - **Support**: support@agentid.xyz
 - **Security**: security@agentid.xyz
 - **Enterprise**: enterprise@agentid.xyz
-- **Twitter**: @agentidxyz
+- **Twitter**: @agentidbase

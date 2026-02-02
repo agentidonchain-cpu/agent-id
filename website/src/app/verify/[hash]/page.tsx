@@ -236,7 +236,7 @@ export default function VerifyPage() {
               <div className="flex flex-wrap gap-2">
                 {/* Twitter/X - Primary */}
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🤖 This AI agent is verified on-chain!\n\nIdentity anchored on @base via @agentidxyz\n\nVerify it yourself:`)}&url=${encodeURIComponent(`https://id-agent.org/verify/${hash}`)}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`🤖 This AI agent is verified on-chain!\n\nIdentity anchored on @base via @agentidbase\n\nVerify it yourself:`)}&url=${encodeURIComponent(`https://id-agent.org/verify/${hash}`)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-4 py-2 bg-black hover:bg-green-500/10 border border-green-500/30 rounded-lg transition-colors"

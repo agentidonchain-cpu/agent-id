@@ -140,7 +140,7 @@ AgentID is fully open source under the MIT license:
 ## Community
 
 - [Discord](https://discord.gg/agentid)
-- [Twitter](https://twitter.com/agentidxyz)
+- [Twitter](https://twitter.com/agentidbase)
 - [GitHub Discussions](https://github.com/agentid/agentid/discussions)
 
 ---

@@ -73,7 +73,7 @@ export default function Home() {
           <nav className="flex items-center gap-6 text-sm text-[#737373]">
             <a href="https://docs.id-agent.org" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Docs</a>
             <a href="https://github.com/agentidonchain-cpu/agent-id" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">GitHub</a>
-            <a href="https://twitter.com/agentidxyz" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Twitter</a>
+            <a href="https://twitter.com/agentidbase" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Twitter</a>
             <a href="https://medium.com/@agentid" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Medium</a>
           </nav>
         </div>
@@ -396,7 +396,7 @@ export default function Home() {
               <div className="text-[#737373] text-xs">Concepts / Specs</div>
             </a>
             <a
-              href="https://twitter.com/agentidxyz"
+              href="https://twitter.com/agentidbase"
               target="_blank"
               rel="noopener noreferrer"
               className="border border-[#262626] rounded-lg p-4 hover:border-[#737373] transition-colors"
