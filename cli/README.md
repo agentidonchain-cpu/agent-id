@@ -1,85 +1,77 @@
-# agentid
+# AgentID CLI
 
-CLI for registering and verifying AI agent identities on-chain.
+Identidade criptográfica para agentes de IA na blockchain Base.
 
-## Install
-
-```bash
-npx agentid@latest <command>
-```
-
-Or install globally:
+## Instalação
 
 ```bash
-npm install -g agentid
+npm install -g agentidbase
 ```
 
-## Commands
+Ou use diretamente com npx:
+```bash
+npx agentidbase <comando>
+```
 
-### register
+## Fluxo Completo (3 passos)
 
-Register a new agent identity.
+### 1. Registrar seu agente
 
 ```bash
-agentid register
+npx agentidbase register
 ```
 
-Interactive mode prompts for:
-- Agent name
-- Description
-- Model provider and ID
-- API endpoint
-- System prompt
-- Temperature and max tokens
+Isso vai:
+- Gerar um hash único da configuração do seu agente
+- Pedir assinatura via MetaMask (ou usar AGENTID_PRIVATE_KEY)
+- Ancorar automaticamente na blockchain Base (GRÁTIS - nós pagamos o gas)
 
-Or use a config file:
+**Com arquivo de configuração:**
+```bash
+npx agentidbase register --config agent.json
+```
+
+### 2. Verificar Twitter (opcional)
 
 ```bash
-agentid register --config agent.json
+npx agentidbase verify-twitter @seuhandle
 ```
 
-**Options:**
-- `-c, --config <path>` - Path to agent config file (JSON)
-- `--api <url>` - API endpoint (default: https://api.agentid.xyz)
-- `--no-anchor` - Skip blockchain anchoring
+Isso vai:
+- Gerar um código de verificação
+- Pedir pra você postar um tweet com o código
+- Verificar e vincular o Twitter ao seu agente
 
-### verify
-
-Verify an identity directly on-chain.
+### 3. Verificar na blockchain
 
 ```bash
-agentid verify 0x1234...
+npx agentidbase verify 0xSEU_HASH
 ```
 
-**Options:**
-- `--rpc <url>` - RPC endpoint (default: https://mainnet.base.org)
-- `--contract <address>` - Contract address
+Verifica diretamente na Base Mainnet se o agente está ancorado.
 
-### proof
+## Todos os Comandos
 
-Generate verification instructions.
+| Comando | Descrição |
+|---------|-----------|
+| `register` | Registra agente + ancora on-chain (grátis) |
+| `verify <hash>` | Verifica identidade na blockchain |
+| `verify-twitter <@handle>` | Vincula conta do Twitter |
+| `qr <hash>` | Gera QR code de verificação |
+| `proof <hash>` | Mostra comandos para verificar manualmente |
+| `init` | Cria arquivo de configuração |
 
-```bash
-agentid proof 0x1234...
-```
-
-Outputs verification commands for:
-- Foundry (cast)
-- curl (raw JSON-RPC)
-- ethers.js
-
-## Config File Format
+## Exemplo de Configuração (agent.json)
 
 ```json
 {
-  "name": "My Agent",
-  "description": "What this agent does",
+  "name": "Meu Agente",
+  "description": "Um assistente inteligente",
   "model": {
     "provider": "anthropic",
-    "modelId": "claude-3-5-sonnet-20241022",
-    "apiEndpoint": "https://api.anthropic.com/v1/messages"
+    "modelId": "claude-sonnet-4-20250514"
   },
-  "systemPrompt": "You are a helpful assistant...",
+  "systemPrompt": "Você é um assistente útil...",
   "parameters": {
     "temperature": 0.7,
     "maxTokens": 4096
@@ -87,26 +79,36 @@ Outputs verification commands for:
 }
 ```
 
-## Environment Variables
-
-- `AGENTID_API` - API endpoint
-- `AGENTID_CONTRACT` - Contract address
-- `AGENTID_RPC` - RPC endpoint
-
-## Verification Without AgentID
-
-You don't need this CLI to verify an identity. Use any of these:
+## Variáveis de Ambiente
 
 ```bash
-# Foundry
-cast call 0xCONTRACT "verifyIdentity(bytes32)" 0xHASH --rpc-url https://mainnet.base.org
-
-# curl
-curl -X POST https://mainnet.base.org \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"0xCONTRACT","data":"0x..."},"latest"]}'
+# Para assinar automaticamente (sem MetaMask)
+export AGENTID_PRIVATE_KEY="sua-chave-privada"
 ```
 
-## License
+## Links
+
+- Website: https://id-agent.org
+- Verificar agente: https://id-agent.org/verify/0xSEU_HASH
+- Contrato: https://basescan.org/address/0x471C4c43672be2d49A2ceC79203c23b7194A22Fa
+
+## FAQ
+
+**Quanto custa?**
+GRÁTIS. A AgentID paga todas as taxas de gas.
+
+**Preciso de ETH?**
+Não. A AgentID paga o gas por você.
+
+**Preciso de MetaMask?**
+Sim, para assinar a identidade. Ou configure AGENTID_PRIVATE_KEY.
+
+**Posso verificar sem o CLI?**
+Sim! Use cast, ethers.js, ou qualquer cliente Ethereum:
+```bash
+cast call 0x471C4c43672be2d49A2ceC79203c23b7194A22Fa "verifyIdentity(bytes32)" 0xSEU_HASH --rpc-url https://mainnet.base.org
+```
+
+## Licença
 
 MIT

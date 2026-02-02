@@ -25,29 +25,32 @@ const program = new Command();
 program
   .name('agentidbase')
   .description(`
-${chalk.bold.green('AgentID')} - Cryptographic Identity for AI Agents
+${chalk.bold.green('AgentID')} - Identidade Criptográfica para Agentes de IA
 
-Create, register, and verify AI agent identities on the Base blockchain.
-Each agent gets a unique identity hash based on its configuration.
+Registre seu agente na blockchain Base com verificação on-chain.
+${chalk.bold.green('✓ GRÁTIS:')} Nós pagamos todas as taxas de gas!
 
-${chalk.bold.green('✓ FREE:')} Registration and on-chain anchoring are free - we pay the gas!
+${chalk.bold.yellow('═══ COMO USAR (3 PASSOS) ═══')}
 
-${chalk.bold('Quick Start:')}
-  ${chalk.cyan('npx agentidbase init')}              Create agent.json config file
-  ${chalk.cyan('npx agentidbase attest')}            ${chalk.yellow('(DEFAULT)')} Declare an agent exists
-  ${chalk.cyan('npx agentidbase define')}            Fingerprint from config (open agents)
-  ${chalk.cyan('npx agentidbase self')}              Agent self-registers (autonomous)
-  ${chalk.cyan('npx agentidbase register')}          Legacy registration
-  ${chalk.cyan('npx agentidbase verify <hash>')}     Verify any agent identity
-  ${chalk.cyan('npx agentidbase verify-twitter')}    Link Twitter to your agent
-  ${chalk.cyan('npx agentidbase qr <hash>')}         Generate QR code for verification
+  ${chalk.bold('1.')} ${chalk.cyan('npx agentidbase register')}        Registra + ancora on-chain ${chalk.green('(GRÁTIS)')}
+  ${chalk.bold('2.')} ${chalk.cyan('npx agentidbase verify-twitter')}  Vincula Twitter ${chalk.dim('(opcional)')}
+  ${chalk.bold('3.')} ${chalk.cyan('npx agentidbase verify <hash>')}   Verifica na blockchain
 
-${chalk.bold('Contract:')} ${DEFAULT_CONTRACT}
-${chalk.bold('Chain:')}    Base Mainnet (Chain ID: 8453)
+${chalk.bold.yellow('═══ TODOS OS COMANDOS ═══')}
+
+  ${chalk.cyan('init')}              Cria arquivo agent.json
+  ${chalk.cyan('register')}          Registra agente com config ${chalk.dim('(requer wallet)')}
+  ${chalk.cyan('attest')}            Atesta agente de plataforma fechada ${chalk.dim('(ChatGPT, etc.)')}
+  ${chalk.cyan('verify <hash>')}     Verifica identidade on-chain
+  ${chalk.cyan('verify-twitter')}    Vincula conta do Twitter
+  ${chalk.cyan('qr <hash>')}         Gera QR code de verificação
+  ${chalk.cyan('proof <hash>')}      Mostra comandos para verificar manualmente
+
 ${chalk.bold('Website:')}  https://id-agent.org
 ${chalk.bold('Twitter:')}  @agentidbase
+${chalk.bold('Contrato:')} ${DEFAULT_CONTRACT}
 `)
-  .version('0.1.3');
+  .version('0.1.6');
 
 program
   .command('init')
