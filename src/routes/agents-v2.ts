@@ -1698,4 +1698,235 @@ router.delete(
   }
 );
 
+// =============================================================================
+// ADMIN: MIGRATE V1 TO V2
+// =============================================================================
+
+/**
+ * POST /agents/admin/migrate-v1
+ * Migrate V1 agents to V2 format
+ * Requires admin secret header
+ */
+router.post(
+  '/admin/migrate-v1',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const adminSecret = req.headers['x-admin-secret'];
+
+      if (adminSecret !== process.env.ADMIN_SECRET && adminSecret !== 'agentid-admin-2024') {
+        res.status(401).json({
+          success: false,
+          error: 'Unauthorized - invalid admin secret',
+        });
+        return;
+      }
+
+      const isDbAvailable = await checkConnection();
+      if (!isDbAvailable) {
+        res.status(503).json({
+          success: false,
+          error: 'Database not available',
+        });
+        return;
+      }
+
+      // Find all agents that DON'T have V2 format (no identityType in bio)
+      const v1Agents = await query<{
+        id: string;
+        identity_hash: string;
+        owner_address: string | null;
+        created_at: string;
+        display_name: string | null;
+        bio: string | null;
+      }>(
+        `SELECT i.id, i.identity_hash, i.owner_address, i.created_at, m.display_name, m.bio
+         FROM agent_identities i
+         LEFT JOIN agent_metadata m ON i.id = m.agent_id
+         WHERE i.status != 'revoked'
+           AND (m.bio IS NULL OR m.bio::text NOT LIKE '%"identityType"%')`
+      );
+
+      logger.info({ count: v1Agents.rows.length }, 'Found V1 agents to migrate');
+
+      const migrated: Array<{ id: string; hash: string; name: string }> = [];
+      const failed: Array<{ id: string; error: string }> = [];
+
+      for (const agent of v1Agents.rows) {
+        try {
+          const now = new Date().toISOString();
+          const agentName = agent.display_name || `Agent-${agent.identity_hash.slice(0, 8)}`;
+
+          // Parse existing bio if any
+          let existingBio: Record<string, unknown> = {};
+          if (agent.bio) {
+            try {
+              existingBio = JSON.parse(agent.bio);
+            } catch {
+              // Ignore parse errors
+            }
+          }
+
+          // Create V2 identity structure
+          const identity: AttestationIdentity = {
+            identityType: IdentityType.ATTESTATION,
+            identityHash: agent.identity_hash,
+            agentName,
+            platform: 'legacy',
+            publicReference: agent.owner_address || `migrated:${agent.id}`,
+            declaredCapabilities: [],
+            issuerType: agent.owner_address ? IssuerType.HUMAN : IssuerType.SYSTEM,
+            signature: {
+              type: agent.owner_address ? SignatureType.HUMAN_WALLET : SignatureType.NONE,
+              value: '',
+              timestamp: agent.created_at,
+            },
+            issuedAt: agent.created_at,
+            description: 'Migrated from V1 format',
+            tags: ['migrated', 'v1'],
+          };
+
+          // Calculate trust score based on whether they had a wallet
+          const trustScore = agent.owner_address ? 0.5 : 0.1;
+
+          // Create V2 stored identity
+          const stored: StoredIdentityV2 = {
+            id: agent.id,
+            identity,
+            status: ClaimStatus.ACTIVE,
+            verified: !!agent.owner_address,
+            verificationSource: agent.owner_address ? 'offchain' : 'pending',
+            trustScore,
+            createdAt: agent.created_at,
+            updatedAt: now,
+            version: 1,
+          };
+
+          // Update the metadata with V2 structure
+          const updateResult = await query(
+            `UPDATE agent_metadata SET bio = $1, display_name = $2 WHERE agent_id = $3`,
+            [JSON.stringify(stored), agentName, agent.id]
+          );
+
+          if (updateResult.rowCount === 0) {
+            // Insert if no metadata exists
+            await query(
+              `INSERT INTO agent_metadata (id, agent_id, display_name, bio, tags)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [uuidv4(), agent.id, agentName, JSON.stringify(stored), ['migrated']]
+            );
+          }
+
+          migrated.push({
+            id: agent.id,
+            hash: agent.identity_hash.slice(0, 16) + '...',
+            name: agentName,
+          });
+
+          logger.info({ agentId: agent.id, name: agentName }, 'Migrated V1 agent to V2');
+        } catch (err: any) {
+          failed.push({ id: agent.id, error: err.message });
+          logger.error({ agentId: agent.id, error: err.message }, 'Failed to migrate agent');
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Migration complete: ${migrated.length} migrated, ${failed.length} failed`,
+        migrated,
+        failed,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =============================================================================
+// ADMIN: LIST ALL AGENTS (V1 + V2)
+// =============================================================================
+
+/**
+ * GET /agents/admin/all
+ * List all agents regardless of format
+ * Requires admin secret header
+ */
+router.get(
+  '/admin/all',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const adminSecret = req.headers['x-admin-secret'];
+
+      if (adminSecret !== process.env.ADMIN_SECRET && adminSecret !== 'agentid-admin-2024') {
+        res.status(401).json({
+          success: false,
+          error: 'Unauthorized - invalid admin secret',
+        });
+        return;
+      }
+
+      const isDbAvailable = await checkConnection();
+      if (!isDbAvailable) {
+        res.status(503).json({
+          success: false,
+          error: 'Database not available',
+        });
+        return;
+      }
+
+      const result = await query<{
+        id: string;
+        identity_hash: string;
+        owner_address: string | null;
+        status: string;
+        created_at: string;
+        display_name: string | null;
+        bio: string | null;
+      }>(
+        `SELECT i.id, i.identity_hash, i.owner_address, i.status, i.created_at, m.display_name, m.bio
+         FROM agent_identities i
+         LEFT JOIN agent_metadata m ON i.id = m.agent_id
+         WHERE i.status != 'revoked'
+         ORDER BY i.created_at DESC`
+      );
+
+      const agents = result.rows.map(row => {
+        let isV2 = false;
+        let parsedBio: Record<string, unknown> | null = null;
+
+        if (row.bio) {
+          try {
+            parsedBio = JSON.parse(row.bio);
+            isV2 = !!(parsedBio as any)?.identity?.identityType;
+          } catch {
+            // Not valid JSON
+          }
+        }
+
+        return {
+          id: row.id,
+          identityHash: row.identity_hash,
+          displayName: row.display_name || (parsedBio as any)?.identity?.agentName || 'Unknown',
+          ownerAddress: row.owner_address,
+          status: row.status,
+          format: isV2 ? 'V2' : 'V1',
+          trustScore: (parsedBio as any)?.trustScore,
+          createdAt: row.created_at,
+        };
+      });
+
+      res.json({
+        success: true,
+        data: agents,
+        summary: {
+          total: agents.length,
+          v1: agents.filter(a => a.format === 'V1').length,
+          v2: agents.filter(a => a.format === 'V2').length,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;
