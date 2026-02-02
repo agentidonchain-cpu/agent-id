@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
 const CONTRACT_ADDRESS = "0x471C4c43672be2d49A2ceC79203c23b7194A22Fa";
+const TOKEN_ADDRESS = "0x7E56f85529318a6a6Ea3C3D279a8F17Ec77B0B07";
 const RPC_URL = "https://mainnet.base.org";
 const CHAIN = "Base Mainnet";
 const CHAIN_ID = "8453";
@@ -247,7 +248,37 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 pt-32 pb-20">
+      {/* Token Launch Banner */}
+      <div className="fixed top-[73px] left-0 right-0 z-40 bg-gradient-to-r from-[#22c55e]/20 via-[#22c55e]/10 to-[#22c55e]/20 border-b border-[#22c55e]/30">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-center gap-3 text-sm">
+          <span className="inline-flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#22c55e]"></span>
+            </span>
+            <span className="text-[#22c55e] font-semibold">NEW</span>
+          </span>
+          <span className="text-[#e5e5e5]">$AGENTID Token launched on Base!</span>
+          <a
+            href={`https://basescan.org/token/${TOKEN_ADDRESS}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#22c55e] hover:text-[#4ade80] font-mono text-xs underline underline-offset-2"
+          >
+            {TOKEN_ADDRESS.slice(0, 10)}...{TOKEN_ADDRESS.slice(-8)}
+          </a>
+          <a
+            href={`https://app.uniswap.org/swap?outputCurrency=${TOKEN_ADDRESS}&chain=base`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-2 px-3 py-1 bg-[#22c55e] text-black text-xs font-semibold rounded-full hover:bg-[#4ade80] transition-colors"
+          >
+            Buy on Uniswap
+          </a>
+        </div>
+      </div>
+
+      <main className="max-w-7xl mx-auto px-6 pt-44 pb-20">
         {/* Hero Section with Counter */}
         <section className="py-12">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -601,7 +632,7 @@ export default function Home() {
               <span>{CHAIN_ID}</span>
             </div>
             <div className="flex justify-between border-b border-[#262626] pb-2">
-              <span className="text-[#737373]">Contract</span>
+              <span className="text-[#737373]">Identity Contract</span>
               <a
                 href={`https://basescan.org/address/${CONTRACT_ADDRESS}`}
                 target="_blank"
@@ -609,6 +640,17 @@ export default function Home() {
                 className="text-[#22c55e] hover:underline font-mono text-xs"
               >
                 {CONTRACT_ADDRESS.slice(0, 10)}...{CONTRACT_ADDRESS.slice(-8)}
+              </a>
+            </div>
+            <div className="flex justify-between border-b border-[#262626] pb-2">
+              <span className="text-[#737373]">$AGENTID Token</span>
+              <a
+                href={`https://basescan.org/token/${TOKEN_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#22c55e] hover:underline font-mono text-xs"
+              >
+                {TOKEN_ADDRESS.slice(0, 10)}...{TOKEN_ADDRESS.slice(-8)}
               </a>
             </div>
             <div className="flex justify-between border-b border-[#262626] pb-2">
@@ -697,10 +739,28 @@ export default function Home() {
               <div className="text-[#e5e5e5] mb-1">Identity Registry</div>
               <div className="text-[#737373] text-xs">On-chain ID contract</div>
             </a>
+            <a
+              href={`https://basescan.org/token/${TOKEN_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-[#22c55e]/50 rounded-lg p-4 hover:border-[#22c55e] transition-colors bg-[#22c55e]/5"
+            >
+              <div className="text-[#22c55e] mb-1">$AGENTID Token</div>
+              <div className="text-[#737373] text-xs">Governance token on Base</div>
+            </a>
+            <a
+              href={`https://app.uniswap.org/swap?outputCurrency=${TOKEN_ADDRESS}&chain=base`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border border-[#262626] rounded-lg p-4 hover:border-[#737373] transition-colors"
+            >
+              <div className="text-[#e5e5e5] mb-1">Uniswap</div>
+              <div className="text-[#737373] text-xs">Trade $AGENTID</div>
+            </a>
           </div>
 
           <p className="text-xs text-[#525252] mt-6">
-            Note: The contract is an identity registry for anchoring agent fingerprints — not a token or currency.
+            The Identity Registry contract anchors agent fingerprints on-chain. The $AGENTID token powers governance.
           </p>
         </section>
       </main>
