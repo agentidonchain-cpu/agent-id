@@ -25,6 +25,9 @@ interface AgentData {
   publicReference?: string;
   trustScore?: number;
   trustDescription?: string;
+  // On-chain fields
+  txHash?: string;
+  blockNumber?: number;
 }
 
 const API_URL = 'https://agent007-api-production.up.railway.app';
@@ -59,6 +62,8 @@ export default function VerifyPage() {
               publicReference: d.publicReference,
               trustScore: d.trustScore,
               trustDescription: d.trustDescription,
+              txHash: d.anchor?.txHash,
+              blockNumber: d.anchor?.blockNumber,
             });
             setLoading(false);
             return;
@@ -289,6 +294,40 @@ export default function VerifyPage() {
                 <dd className="text-sm text-green-400">Base Mainnet (8453)</dd>
               </div>
 
+              {/* TX Hash (on-chain) */}
+              {agent.txHash && (
+                <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
+                  <dt className="text-xs text-green-300 mb-1">Transaction</dt>
+                  <dd className="text-sm font-mono break-all">
+                    <a
+                      href={`${BASESCAN_URL}/tx/${agent.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-400 hover:text-green-300 underline"
+                    >
+                      {agent.txHash.slice(0, 10)}...{agent.txHash.slice(-8)}
+                    </a>
+                  </dd>
+                </div>
+              )}
+
+              {/* Block Number (on-chain) */}
+              {agent.blockNumber && (
+                <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
+                  <dt className="text-xs text-green-300 mb-1">Block</dt>
+                  <dd className="text-sm font-mono">
+                    <a
+                      href={`${BASESCAN_URL}/block/${agent.blockNumber}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-400 hover:text-green-300 underline"
+                    >
+                      #{agent.blockNumber.toLocaleString()}
+                    </a>
+                  </dd>
+                </div>
+              )}
+
               {/* Platform (V2) */}
               {agent.platform && (
                 <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
@@ -323,13 +362,21 @@ export default function VerifyPage() {
             {/* Action Buttons */}
             <div className="mt-8 space-y-3">
               <a
-                href={`${BASESCAN_URL}/address/${CONTRACT_ADDRESS}`}
+                href={`${BASESCAN_URL}/address/${CONTRACT_ADDRESS}#readContract`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full px-4 py-3 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-center transition-colors"
               >
-                View Contract on BaseScan
+                Verify on BaseScan (Read Contract)
               </a>
+
+              {/* Contract Info */}
+              <div className="p-4 bg-black border border-green-500/20 rounded-lg">
+                <p className="text-xs text-green-300 mb-2">Contract Address:</p>
+                <code className="text-xs text-green-400 block bg-green-500/5 p-2 rounded overflow-x-auto break-all">
+                  {CONTRACT_ADDRESS}
+                </code>
+              </div>
 
               <div className="p-4 bg-black border border-green-500/20 rounded-lg">
                 <p className="text-xs text-green-300 mb-2">Verify via CLI:</p>
