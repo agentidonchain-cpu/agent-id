@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../utils/logger.js';
 import { getAgentStorageService } from '../services/storage/index.js';
 import { verifyTweet } from '../services/twitter/twitter-api.js';
+import { query, checkConnection } from '../config/database.js';
 import {
   generateChallengeCode,
   normalizeTwitterHandle,
@@ -19,6 +20,37 @@ import {
   type TwitterVerification,
 } from '../types/verification.js';
 import { ValidationError, NotFoundError } from '../middleware/errorHandler.js';
+
+// =============================================================================
+// HELPER: Check if identity exists in either V1 or V2 storage
+// =============================================================================
+
+async function identityExists(identityHash: string): Promise<boolean> {
+  // Check V1 storage first
+  const storage = getAgentStorageService();
+  const v1Identity = await storage.getIdentity(identityHash);
+  if (v1Identity) {
+    return true;
+  }
+
+  // Check V2 storage (agent_identities table)
+  try {
+    const isDbAvailable = await checkConnection();
+    if (isDbAvailable) {
+      const result = await query<{ count: string }>(
+        'SELECT COUNT(*) as count FROM agent_identities WHERE identity_hash = $1',
+        [identityHash]
+      );
+      if (result.rows.length > 0 && parseInt(result.rows[0].count, 10) > 0) {
+        return true;
+      }
+    }
+  } catch (error) {
+    logger.warn({ error, identityHash }, 'Error checking V2 identity');
+  }
+
+  return false;
+}
 
 const router = Router();
 
@@ -69,11 +101,10 @@ router.post(
         'Twitter verification init requested'
       );
 
-      // Verify the agent exists
-      const storage = getAgentStorageService();
-      const identity = await storage.getIdentity(identityHash);
+      // Verify the agent exists (check both V1 and V2 storage)
+      const exists = await identityExists(identityHash);
 
-      if (!identity) {
+      if (!exists) {
         throw new NotFoundError('Agent identity');
       }
 
