@@ -18,6 +18,7 @@ import { logger } from '../utils/logger.js';
 import { ValidationError, NotFoundError, ConflictError } from '../middleware/errorHandler.js';
 import { query, checkConnection } from '../config/database.js';
 import { getBlockchainService } from '../services/blockchain/base-chain.js';
+import { getWebSocketService } from '../services/realtime/websocket.js';
 import {
   IdentityType,
   IssuerType,
@@ -466,6 +467,20 @@ router.post(
       // Auto-anchor on blockchain (async, non-blocking)
       autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
 
+      // Emit WebSocket event for live feed
+      try {
+        const wsService = getWebSocketService();
+        wsService.emitAgentRegistered({
+          identityHash,
+          displayName: data.agentName,
+          provider: data.platform,
+          modelId: 'attestation',
+        });
+        wsService.emitStatsUpdate();
+      } catch (e) {
+        logger.warn({ error: e }, 'Failed to emit WebSocket event');
+      }
+
       logger.info(
         { identityHash: identityHash.slice(0, 16) + '...', agentName: data.agentName, issuerType },
         'Attestation identity created'
@@ -616,6 +631,20 @@ router.post(
 
       // Auto-anchor on blockchain (async, non-blocking)
       autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
+
+      // Emit WebSocket event for live feed
+      try {
+        const wsService = getWebSocketService();
+        wsService.emitAgentRegistered({
+          identityHash,
+          displayName: data.agentName,
+          provider: 'autonomous',
+          modelId: 'self_claim',
+        });
+        wsService.emitStatsUpdate();
+      } catch (e) {
+        logger.warn({ error: e }, 'Failed to emit WebSocket event');
+      }
 
       logger.info(
         { identityHash: identityHash.slice(0, 16) + '...', agentName: data.agentName },
@@ -780,6 +809,20 @@ router.post(
 
       // Auto-anchor on blockchain (async, non-blocking)
       autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
+
+      // Emit WebSocket event for live feed
+      try {
+        const wsService = getWebSocketService();
+        wsService.emitAgentRegistered({
+          identityHash,
+          displayName: data.agentName,
+          provider: data.model.provider,
+          modelId: data.model.modelId,
+        });
+        wsService.emitStatsUpdate();
+      } catch (e) {
+        logger.warn({ error: e }, 'Failed to emit WebSocket event');
+      }
 
       logger.info(
         { identityHash: identityHash.slice(0, 16) + '...', agentName: data.agentName },

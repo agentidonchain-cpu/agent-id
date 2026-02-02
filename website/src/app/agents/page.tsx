@@ -8,10 +8,15 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://agent007-api-production.
 
 interface Agent {
   identityHash: string;
-  displayName: string;
+  agentName?: string;
+  displayName?: string;
   avatar?: string;
-  tags: string[];
-  model: {
+  tags?: string[];
+  identityType?: string;
+  platform?: string;
+  trustScore?: number;
+  trustDescription?: string;
+  model?: {
     provider: string;
     modelId: string;
   };
@@ -35,11 +40,18 @@ export default function AgentsPage() {
   const [isLive, setIsLive] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
-  // Fetch agents from API
+  // Fetch agents from API (try V2 first, fallback to V1)
   const fetchAgents = useCallback(async (pageNum: number) => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/v1/agents?page=${pageNum}&pageSize=20`);
+
+      // Try V2 first
+      let response = await fetch(`${API_URL}/api/v2/agents?page=${pageNum}&pageSize=20`);
+
+      // Fallback to V1 if V2 fails
+      if (!response.ok) {
+        response = await fetch(`${API_URL}/api/v1/agents?page=${pageNum}&pageSize=20`);
+      }
 
       if (!response.ok) {
         throw new Error('Failed to fetch agents');
@@ -232,11 +244,23 @@ export default function AgentsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 mb-2">
                       <h2 className="text-lg font-medium text-[#e5e5e5] truncate">
-                        {agent.displayName || 'Unnamed Agent'}
+                        {agent.agentName || agent.displayName || 'Unnamed Agent'}
                       </h2>
-                      <span className={`text-xs px-2 py-0.5 rounded border ${getProviderColor(agent.model.provider)}`}>
-                        {agent.model.provider}
-                      </span>
+                      {agent.identityType && (
+                        <span className="text-xs px-2 py-0.5 rounded border bg-blue-500/20 text-blue-400 border-blue-500/30">
+                          {agent.identityType}
+                        </span>
+                      )}
+                      {agent.platform && (
+                        <span className="text-xs px-2 py-0.5 rounded border bg-purple-500/20 text-purple-400 border-purple-500/30">
+                          {agent.platform}
+                        </span>
+                      )}
+                      {agent.model?.provider && (
+                        <span className={`text-xs px-2 py-0.5 rounded border ${getProviderColor(agent.model.provider)}`}>
+                          {agent.model.provider}
+                        </span>
+                      )}
                     </div>
 
                     <div className="font-mono text-sm text-[#737373] truncate mb-3">
@@ -244,9 +268,18 @@ export default function AgentsPage() {
                     </div>
 
                     <div className="flex items-center gap-4 text-xs text-[#525252]">
-                      <span>Model: {agent.model.modelId}</span>
+                      {agent.model?.modelId && <span>Model: {agent.model.modelId}</span>}
+                      {agent.trustScore !== undefined && (
+                        <span>Trust: {(agent.trustScore * 100).toFixed(0)}%</span>
+                      )}
                       <span>Verified: {formatDate(agent.validatedAt || agent.createdAt)}</span>
                     </div>
+
+                    {agent.trustDescription && (
+                      <div className="text-xs text-[#525252] mt-1">
+                        {agent.trustDescription}
+                      </div>
+                    )}
 
                     {agent.tags && agent.tags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-3">
