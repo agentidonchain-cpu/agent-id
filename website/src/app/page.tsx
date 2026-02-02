@@ -633,25 +633,31 @@ export default function Home() {
             </div>
             <div className="flex justify-between border-b border-[#262626] pb-2">
               <span className="text-[#737373]">Identity Contract</span>
-              <a
-                href={`https://basescan.org/address/${CONTRACT_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#22c55e] hover:underline font-mono text-xs"
-              >
-                {CONTRACT_ADDRESS.slice(0, 10)}...{CONTRACT_ADDRESS.slice(-8)}
-              </a>
+              <div className="flex items-center gap-2">
+                <span className="text-[#ef4444] text-xs px-1.5 py-0.5 bg-[#ef4444]/10 rounded">NOT A TOKEN</span>
+                <a
+                  href={`https://basescan.org/address/${CONTRACT_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#737373] hover:underline font-mono text-xs"
+                >
+                  {CONTRACT_ADDRESS.slice(0, 10)}...{CONTRACT_ADDRESS.slice(-8)}
+                </a>
+              </div>
             </div>
             <div className="flex justify-between border-b border-[#262626] pb-2">
               <span className="text-[#737373]">$AGENTID Token</span>
-              <a
-                href={`https://basescan.org/token/${TOKEN_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#22c55e] hover:underline font-mono text-xs"
-              >
-                {TOKEN_ADDRESS.slice(0, 10)}...{TOKEN_ADDRESS.slice(-8)}
-              </a>
+              <div className="flex items-center gap-2">
+                <span className="text-[#22c55e] text-xs px-1.5 py-0.5 bg-[#22c55e]/10 rounded">OFFICIAL</span>
+                <a
+                  href={`https://basescan.org/token/${TOKEN_ADDRESS}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#22c55e] hover:underline font-mono text-xs"
+                >
+                  {TOKEN_ADDRESS.slice(0, 10)}...{TOKEN_ADDRESS.slice(-8)}
+                </a>
+              </div>
             </div>
             <div className="flex justify-between border-b border-[#262626] pb-2">
               <span className="text-[#737373]">Block explorer</span>
@@ -674,6 +680,35 @@ export default function Home() {
               >
                 agentidbase
               </a>
+            </div>
+          </div>
+
+          {/* Important Warning Box */}
+          <div className="mt-8 p-5 bg-[#ef4444]/5 border border-[#ef4444]/30 rounded-lg max-w-2xl">
+            <div className="flex items-start gap-3">
+              <div className="text-[#ef4444] text-xl mt-0.5">⚠️</div>
+              <div>
+                <h4 className="text-[#ef4444] font-semibold mb-2">Important: Two Different Contracts</h4>
+                <p className="text-[#a3a3a3] text-sm mb-3">
+                  The <span className="text-[#e5e5e5] font-mono">Identity Registry Contract</span> is <span className="text-[#ef4444] font-semibold">NOT a token</span>.
+                  It is a technical contract that stores cryptographic hashes of AI agents on-chain.
+                  <span className="text-[#ef4444]"> Do not attempt to buy or trade this contract address.</span>
+                </p>
+                <div className="grid gap-2 text-sm">
+                  <div className="flex items-center gap-2 p-2 bg-[#ef4444]/10 rounded">
+                    <span className="text-[#ef4444]">✗</span>
+                    <span className="text-[#737373]">Identity Registry:</span>
+                    <code className="text-[#ef4444] font-mono text-xs">{CONTRACT_ADDRESS.slice(0, 14)}...</code>
+                    <span className="text-[#ef4444] text-xs">← NOT A TOKEN</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-[#22c55e]/10 rounded">
+                    <span className="text-[#22c55e]">✓</span>
+                    <span className="text-[#737373]">$AGENTID Token:</span>
+                    <code className="text-[#22c55e] font-mono text-xs">{TOKEN_ADDRESS.slice(0, 14)}...</code>
+                    <span className="text-[#22c55e] text-xs">← OFFICIAL TOKEN</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
