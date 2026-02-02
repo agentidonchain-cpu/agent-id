@@ -197,6 +197,76 @@ npx agentidbase verify-twitter @yourhandle`}</code>
           </div>
         </section>
 
+        {/* Trust Score */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Trust Score</h2>
+
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 mb-6">
+            <p className="text-[#737373] mb-4">
+              Every agent identity has a trust score from 0 to 1.0 that indicates how much verification
+              has been done. Higher scores mean more verifications.
+            </p>
+
+            <h4 className="font-medium mb-3">How Trust Score is Calculated</h4>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#737373]">Base attestation (no signature)</span>
+                <span className="font-mono text-yellow-400">0.1</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#737373]">Self-claim (agent keypair)</span>
+                <span className="font-mono text-yellow-400">0.2 - 0.3</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#737373]">Fingerprint (config hash)</span>
+                <span className="font-mono text-cyan-400">0.3 - 0.7</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#737373]">Human wallet signature</span>
+                <span className="font-mono text-green-400">0.5 - 0.6</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#737373]">Twitter verification</span>
+                <span className="font-mono text-blue-400">+0.1 bonus</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#737373]">System prompt hash included</span>
+                <span className="font-mono text-purple-400">+0.1 bonus</span>
+              </div>
+            </div>
+
+            <h4 className="font-medium mb-3">Trust Level Descriptions</h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex gap-3">
+                <span className="w-20 text-red-400 font-medium">0.0 - 0.2</span>
+                <span className="text-[#737373]">Unverified - minimal trust, no proof of control</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-20 text-yellow-400 font-medium">0.2 - 0.4</span>
+                <span className="text-[#737373]">Basic - some verification, use with caution</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-20 text-cyan-400 font-medium">0.4 - 0.6</span>
+                <span className="text-[#737373]">Moderate - wallet or Twitter verified</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-20 text-green-400 font-medium">0.6 - 0.8</span>
+                <span className="text-[#737373]">Good - multiple verifications, config auditable</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="w-20 text-[#22c55e] font-medium">0.8 - 1.0</span>
+                <span className="text-[#737373]">High - fully verified with multiple proofs</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm">
+            <strong className="text-blue-400">Tip:</strong>
+            <span className="text-[#737373]"> To maximize your trust score, use a wallet signature, link Twitter, and include your agent&apos;s system prompt hash.</span>
+          </div>
+        </section>
+
         {/* CLI Commands */}
         <section className="mb-16">
           <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">CLI Commands</h2>

@@ -508,33 +508,58 @@ export class AgentStorageService {
     identityHash: string,
     verification: TwitterVerificationData
   ): Promise<boolean> {
-    // Update memory
+    // Update memory cache
     const identity = this.identities.get(identityHash);
     if (identity) {
       if (!identity.verifications) {
         identity.verifications = {};
       }
       identity.verifications.twitter = verification;
-
-      logger.info(
-        { identityHash: identityHash.slice(0, 10) + '...', handle: verification.handle },
-        'Twitter verification saved to memory'
-      );
     }
 
-    // TODO: Persist to database if available
-    // For now, just use memory storage
+    // Persist to database
     if (this.dbAvailable) {
       try {
-        // Database persistence would go here
-        // await agentRepo.saveTwitterVerification(identityHash, verification);
-        logger.info(
-          { identityHash: identityHash.slice(0, 10) + '...' },
-          'Twitter verification would be persisted to database'
+        const { query } = await import('../../config/database.js');
+
+        await query(
+          `INSERT INTO social_verifications (
+            identity_hash, platform, platform_user_id, platform_username,
+            challenge_code, proof_url, proof_id, verified_at, metadata
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          ON CONFLICT (identity_hash, platform) DO UPDATE SET
+            platform_user_id = EXCLUDED.platform_user_id,
+            platform_username = EXCLUDED.platform_username,
+            proof_url = EXCLUDED.proof_url,
+            proof_id = EXCLUDED.proof_id,
+            verified_at = EXCLUDED.verified_at,
+            status = 'verified'`,
+          [
+            identityHash,
+            'twitter',
+            verification.userId,
+            verification.handle,
+            verification.challengeCode,
+            verification.proofUrl,
+            verification.tweetId,
+            verification.verifiedAt,
+            JSON.stringify({ type: verification.type }),
+          ]
         );
+
+        logger.info(
+          { identityHash: identityHash.slice(0, 10) + '...', handle: verification.handle },
+          'Twitter verification persisted to database'
+        );
+        return true;
       } catch (error) {
         logger.error({ error, identityHash }, 'Failed to persist Twitter verification to database');
       }
+    } else {
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', handle: verification.handle },
+        'Twitter verification saved to memory only (database unavailable)'
+      );
     }
 
     return identity !== undefined;
@@ -550,8 +575,51 @@ export class AgentStorageService {
       return identity.verifications.twitter;
     }
 
-    // TODO: Check database if available
-    // For now, just use memory storage
+    // Check database
+    if (this.dbAvailable) {
+      try {
+        const { query } = await import('../../config/database.js');
+
+        const result = await query<{
+          platform_user_id: string;
+          platform_username: string;
+          challenge_code: string;
+          proof_url: string;
+          proof_id: string;
+          verified_at: Date;
+        }>(
+          `SELECT platform_user_id, platform_username, challenge_code, proof_url, proof_id, verified_at
+           FROM social_verifications
+           WHERE identity_hash = $1 AND platform = 'twitter' AND status = 'verified'`,
+          [identityHash]
+        );
+
+        if (result.rows.length > 0) {
+          const row = result.rows[0];
+          const verification: TwitterVerificationData = {
+            type: 'twitter',
+            handle: row.platform_username,
+            userId: row.platform_user_id,
+            tweetId: row.proof_id,
+            verifiedAt: row.verified_at.toISOString(),
+            proofUrl: row.proof_url,
+            challengeCode: row.challenge_code,
+          };
+
+          // Cache in memory
+          if (identity) {
+            if (!identity.verifications) {
+              identity.verifications = {};
+            }
+            identity.verifications.twitter = verification;
+          }
+
+          return verification;
+        }
+      } catch (error) {
+        logger.error({ error, identityHash }, 'Failed to fetch Twitter verification from database');
+      }
+    }
 
     return null;
   }

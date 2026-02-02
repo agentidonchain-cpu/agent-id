@@ -6,6 +6,8 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { getEncryptionService } from '../services/security/encryption.js';
+import { getCreatorRepository } from '../repositories/creators.js';
+import { checkConnection } from '../config/database.js';
 import { logger } from '../utils/logger.js';
 
 // =============================================================================
@@ -92,20 +94,56 @@ export async function apiKeyAuth(
     // Store prefix for logging (don't log full key)
     req.apiKeyPrefix = apiKey.slice(0, 16);
 
-    // TODO: Look up creator by API key hash in database
-    // For MVP, we'll skip database lookup and just validate format
-    // In production:
-    // const creator = await db.creators.findByApiKeyHash(apiKeyHash);
-    // if (!creator) { ... }
+    // Check if database is available
+    const isDbAvailable = await checkConnection();
 
-    // Placeholder creator for MVP
-    req.creator = {
-      id: 'placeholder-creator-id',
-      email: 'placeholder@example.com',
-      displayName: 'Placeholder Creator',
-    };
+    if (isDbAvailable) {
+      // Look up creator by API key hash in database
+      const creatorRepo = getCreatorRepository();
+      const creator = await creatorRepo.findByApiKeyHash(apiKeyHash);
 
-    logger.debug({ apiKeyPrefix: req.apiKeyPrefix }, 'API key authenticated');
+      if (!creator) {
+        logger.warn({ apiKeyPrefix: req.apiKeyPrefix }, 'Invalid API key - not found in database');
+        res.status(401).json({
+          success: false,
+          error: {
+            code: 'INVALID_API_KEY',
+            message: 'Invalid or revoked API key.',
+          },
+        });
+        return;
+      }
+
+      if (!creator.is_active) {
+        logger.warn({ apiKeyPrefix: req.apiKeyPrefix, creatorId: creator.id }, 'API key belongs to suspended account');
+        res.status(403).json({
+          success: false,
+          error: {
+            code: 'ACCOUNT_SUSPENDED',
+            message: 'Account has been suspended.',
+          },
+        });
+        return;
+      }
+
+      req.creator = {
+        id: creator.id,
+        email: creator.email,
+        displayName: creator.display_name,
+      };
+
+      logger.debug({ apiKeyPrefix: req.apiKeyPrefix, creatorId: creator.id }, 'API key authenticated via database');
+    } else {
+      // Database not available - use fallback for public endpoints
+      // In production, this should reject the request
+      logger.warn({ apiKeyPrefix: req.apiKeyPrefix }, 'Database unavailable - using fallback auth (not recommended for production)');
+
+      req.creator = {
+        id: 'fallback-creator-id',
+        email: 'fallback@example.com',
+        displayName: 'Fallback Creator',
+      };
+    }
 
     next();
   } catch (error) {

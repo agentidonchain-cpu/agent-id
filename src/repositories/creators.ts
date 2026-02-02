@@ -120,6 +120,17 @@ export class CreatorRepository {
   }
 
   /**
+   * Find creator by API key hash (for authentication)
+   */
+  async findByApiKeyHash(apiKeyHash: string): Promise<CreatorRow | null> {
+    const result = await query<CreatorRow>(
+      'SELECT * FROM creators WHERE api_key_hash = $1 AND is_active = TRUE',
+      [apiKeyHash]
+    );
+    return result.rows[0] || null;
+  }
+
+  /**
    * Find creator by wallet address
    */
   async findByWallet(walletAddress: string): Promise<CreatorRow | null> {
