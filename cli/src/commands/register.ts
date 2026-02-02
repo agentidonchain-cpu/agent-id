@@ -396,7 +396,7 @@ async function promptConfig(): Promise<AgentConfig> {
 function generateIdentityHash(config: AgentConfig): string {
   const canonical = JSON.stringify({
     systemPrompt: {
-      content: config.systemPrompt,
+      content: config.systemPrompt || '',
       version: '1.0',
     },
     model: {
@@ -404,8 +404,8 @@ function generateIdentityHash(config: AgentConfig): string {
       modelId: config.model.modelId,
     },
     parameters: {
-      temperature: config.parameters.temperature,
-      maxTokens: config.parameters.maxTokens,
+      temperature: config.parameters?.temperature ?? 0.7,
+      maxTokens: config.parameters?.maxTokens ?? 4096,
     },
   }, Object.keys({
     systemPrompt: null,
