@@ -1538,21 +1538,35 @@ router.delete(
       let deletedCount = 0;
 
       if (isDbAvailable) {
-        // Delete from database - all attestations with trust_score 0.1 (unverified test data)
-        const result = await query(
-          `DELETE FROM agent_identities
-           WHERE identity_hash IN (
-             SELECT identity_hash FROM identities_v2
-             WHERE trust_score = 0.1 AND identity_type = 'attestation'
-           )`
+        // Delete from database - V2 data is stored in agent_metadata.bio as JSON
+        // Find identities where bio JSON has trustScore = 0.1 and identityType = 'attestation'
+        const findResult = await query<{ agent_id: string; identity_hash: string }>(
+          `SELECT m.agent_id, i.identity_hash
+           FROM agent_metadata m
+           JOIN agent_identities i ON i.id = m.agent_id
+           WHERE m.bio IS NOT NULL
+             AND m.bio::jsonb->>'trustScore' = '0.1'
+             AND m.bio::jsonb->'identity'->>'identityType' = 'attestation'`
         );
 
-        const result2 = await query(
-          `DELETE FROM identities_v2
-           WHERE trust_score = 0.1 AND identity_type = 'attestation'`
-        );
+        const idsToDelete = findResult.rows.map(r => r.agent_id);
+        const hashesToDelete = findResult.rows.map(r => r.identity_hash);
 
-        deletedCount = (result.rowCount || 0) + (result2.rowCount || 0);
+        if (idsToDelete.length > 0) {
+          // Delete metadata
+          await query(
+            `DELETE FROM agent_metadata WHERE agent_id = ANY($1)`,
+            [idsToDelete]
+          );
+
+          // Delete identities
+          const result = await query(
+            `DELETE FROM agent_identities WHERE id = ANY($1)`,
+            [idsToDelete]
+          );
+
+          deletedCount = result.rowCount || 0;
+        }
 
         logger.info({ deletedCount }, 'Purged test data from database');
       }
