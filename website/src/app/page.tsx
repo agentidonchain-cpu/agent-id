@@ -438,6 +438,71 @@ export default function Home() {
 
         <div className="border-t border-[#262626] my-12" />
 
+        {/* New Features Section */}
+        <section className="py-12">
+          <h2 className="text-2xl font-semibold mb-8">Features</h2>
+
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Twitter Verification */}
+            <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 hover:border-[#22c55e]/50 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[#1DA1F2]/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#1DA1F2]" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#e5e5e5]">Twitter Verification</h3>
+              </div>
+              <p className="text-[#737373] text-sm mb-4">
+                Link your agent to a Twitter account. Prove social presence without OAuth complexity.
+              </p>
+              <div className="text-xs text-[#525252]">
+                <code className="text-[#22c55e]">npx agentidbase verify-twitter @handle</code>
+              </div>
+            </div>
+
+            {/* SVG Certificates */}
+            <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 hover:border-[#22c55e]/50 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[#22c55e]/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#22c55e]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#e5e5e5]">SVG Certificates</h3>
+              </div>
+              <p className="text-[#737373] text-sm mb-4">
+                Embeddable verification badges. Show your agent&apos;s verified status anywhere.
+              </p>
+              <div className="text-xs text-[#525252]">
+                <code className="text-[#22c55e]">/api/v2/agents/:hash/certificate.svg</code>
+              </div>
+            </div>
+
+            {/* Trust Scores */}
+            <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 hover:border-[#22c55e]/50 transition-colors">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-[#a855f7]/20 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-[#a855f7]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-[#e5e5e5]">Trust Scores</h3>
+              </div>
+              <p className="text-[#737373] text-sm mb-4">
+                Multi-factor trust calculation. Wallet signature, on-chain anchor, Twitter proof.
+              </p>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-1 bg-[#22c55e]/20 text-[#22c55e] rounded">30% Keypair</span>
+                <span className="px-2 py-1 bg-[#22c55e]/20 text-[#22c55e] rounded">50% Wallet</span>
+                <span className="px-2 py-1 bg-[#22c55e]/20 text-[#22c55e] rounded">+20% Chain</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="border-t border-[#262626] my-12" />
+
         {/* CLI Section */}
         <section className="py-12">
           <h2 className="text-2xl font-semibold mb-8">Register your agent via terminal</h2>
@@ -468,7 +533,7 @@ export default function Home() {
           </ul>
 
           {/* All CLI Commands */}
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
               <span className="text-[#737373]"># Initialize config</span><br />
               <code className="text-[#22c55e]">npx agentidbase init</code>
@@ -478,12 +543,20 @@ export default function Home() {
               <code className="text-[#22c55e]">npx agentidbase register</code>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Anchor on-chain</span><br />
-              <code className="text-[#22c55e]">npx agentidbase anchor &lt;hash&gt;</code>
-            </div>
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
               <span className="text-[#737373]"># Verify identity</span><br />
               <code className="text-[#22c55e]">npx agentidbase verify &lt;hash&gt;</code>
+            </div>
+            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
+              <span className="text-[#737373]"># Link Twitter</span><br />
+              <code className="text-[#22c55e]">npx agentidbase verify-twitter @handle</code>
+            </div>
+            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
+              <span className="text-[#737373]"># Generate QR code</span><br />
+              <code className="text-[#22c55e]">npx agentidbase qr &lt;hash&gt;</code>
+            </div>
+            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
+              <span className="text-[#737373]"># Get proof</span><br />
+              <code className="text-[#22c55e]">npx agentidbase proof &lt;hash&gt;</code>
             </div>
           </div>
         </section>
@@ -568,12 +641,13 @@ export default function Home() {
           <p className="text-[#737373] text-sm mb-4">Each agent page displays:</p>
 
           <ul className="space-y-1 text-sm text-[#737373]">
-            <li>- Identity hash</li>
-            <li>- Creator address</li>
-            <li>- Timestamp</li>
-            <li>- Blockchain proof link</li>
-            <li>- Verification command</li>
-            <li>- Status (active / revoked)</li>
+            <li>- Identity hash + QR code</li>
+            <li>- Trust score + verification status</li>
+            <li>- Transaction hash (link to BaseScan)</li>
+            <li>- Block number (link to BaseScan)</li>
+            <li>- Contract address for manual verification</li>
+            <li>- Twitter verification (if linked)</li>
+            <li>- Embeddable SVG certificate</li>
           </ul>
 
           <p className="text-[#737373] text-sm mt-6">
