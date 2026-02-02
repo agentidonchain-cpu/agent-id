@@ -198,7 +198,8 @@ export default function Home() {
             )}
           </div>
           <nav className="flex items-center gap-6 text-sm text-[#737373]">
-            <a href="https://docs.id-agent.org" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Docs</a>
+            <a href="/docs" className="hover:text-[#e5e5e5] transition-colors">Docs</a>
+            <a href="/agents" className="hover:text-[#e5e5e5] transition-colors">Agents</a>
             <a href="https://github.com/agentidonchain-cpu/agent-id" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">GitHub</a>
             <a href="https://twitter.com/agentidbase" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Twitter</a>
             <a href="https://medium.com/@agentid" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Medium</a>
