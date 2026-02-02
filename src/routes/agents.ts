@@ -21,6 +21,7 @@ import { ValidationError, NotFoundError, ConflictError } from '../middleware/err
 import { logger } from '../utils/logger.js';
 import { verifyConfigSignature, verifyAttestationSignature, generateConfigMessage } from '../services/security/signature.js';
 import { computeAttestationHash } from '../types/attestation.js';
+import { getWebSocketService } from '../services/realtime/websocket.js';
 import {
   ModelProvider,
   IdentityStatus,
@@ -414,6 +415,22 @@ router.post(
         'ConfigIdentity registered successfully'
       );
 
+      // Emit WebSocket event for real-time updates
+      try {
+        const wsService = getWebSocketService();
+        wsService.emitAgentRegistered({
+          identityHash,
+          displayName: config.name || 'Unnamed Agent',
+          provider: config.model.provider,
+          modelId: config.model.modelId,
+        });
+        // Trigger stats update
+        wsService.emitStatsUpdate();
+      } catch (wsError) {
+        // WebSocket errors should not fail registration
+        logger.warn({ error: wsError }, 'Failed to emit WebSocket event');
+      }
+
       // Return success response
       res.status(201).json({
         success: true,
@@ -563,6 +580,22 @@ router.post(
         },
         'AttestationIdentity registered successfully'
       );
+
+      // Emit WebSocket event for real-time updates
+      try {
+        const wsService = getWebSocketService();
+        wsService.emitAgentRegistered({
+          identityHash,
+          displayName: declaredName,
+          provider: platform,
+          modelId: 'attestation',
+        });
+        // Trigger stats update
+        wsService.emitStatsUpdate();
+      } catch (wsError) {
+        // WebSocket errors should not fail registration
+        logger.warn({ error: wsError }, 'Failed to emit WebSocket event');
+      }
 
       // Return success response
       res.status(201).json({

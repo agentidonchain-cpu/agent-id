@@ -15,50 +15,82 @@ interface ProofOptions {
 
 export async function proof(identityHash: string, options: ProofOptions): Promise<void> {
   console.log();
-  console.log(chalk.bold('AgentID - Verification Proof'));
-  console.log(chalk.dim('─'.repeat(50)));
+  console.log(chalk.bold.green('╔════════════════════════════════════════════════════════════╗'));
+  console.log(chalk.bold.green('║') + chalk.bold('          AgentID - Independent Verification Proof          ') + chalk.bold.green('║'));
+  console.log(chalk.bold.green('╚════════════════════════════════════════════════════════════╝'));
+  console.log();
+  console.log(chalk.white('This proof allows you to verify an agent identity without relying'));
+  console.log(chalk.white('on AgentID servers. Use these commands to query the blockchain directly.'));
+  console.log();
+  console.log(chalk.dim('─'.repeat(60)));
   console.log();
 
   // Normalize hash
   const hash = identityHash.startsWith('0x') ? identityHash : `0x${identityHash}`;
   const contractAddress = options.contract || DEFAULT_CONTRACT;
 
-  console.log(chalk.bold('Identity'));
-  console.log(chalk.dim('Hash:     ') + chalk.cyan(hash));
+  console.log(chalk.bold.cyan('IDENTITY INFORMATION'));
+  console.log();
+  console.log(chalk.dim('  Identity Hash: ') + chalk.cyan(hash));
+  console.log(chalk.dim('  Chain:         ') + chalk.white('Base Mainnet (Chain ID: 8453)'));
+  console.log(chalk.dim('  Contract:      ') + chalk.white(contractAddress));
+  console.log(chalk.dim('  RPC Endpoint:  ') + chalk.white(options.rpc));
+  console.log();
+  console.log(chalk.dim('─'.repeat(60)));
   console.log();
 
-  console.log(chalk.bold('Blockchain'));
-  console.log(chalk.dim('Chain:    ') + 'Base Mainnet (8453)');
-  console.log(chalk.dim('Contract: ') + chalk.cyan(contractAddress));
-  console.log(chalk.dim('RPC:      ') + options.rpc);
+  console.log(chalk.bold.cyan('VERIFICATION METHODS'));
+  console.log();
+  console.log(chalk.white('Choose any method below to verify this identity independently:'));
   console.log();
 
-  console.log(chalk.bold('Verify without AgentID'));
+  console.log(chalk.bold.yellow('Method 1: Using Foundry (cast)'));
+  console.log(chalk.dim('Best for developers with Foundry installed'));
   console.log();
-  console.log(chalk.dim('Using cast (foundry):'));
-  console.log(chalk.white(`  cast call ${contractAddress} \\`));
-  console.log(chalk.white(`    "verifyIdentity(bytes32)" ${hash} \\`));
-  console.log(chalk.white(`    --rpc-url ${options.rpc}`));
+  console.log(chalk.gray('  ') + chalk.white(`cast call ${contractAddress} \\`));
+  console.log(chalk.gray('    ') + chalk.white(`"verifyIdentity(bytes32)" ${hash} \\`));
+  console.log(chalk.gray('    ') + chalk.white(`--rpc-url ${options.rpc}`));
   console.log();
 
-  console.log(chalk.dim('Using curl (raw JSON-RPC):'));
+  console.log(chalk.bold.yellow('Method 2: Using curl (raw JSON-RPC)'));
+  console.log(chalk.dim('Works on any system with curl'));
+  console.log();
   const calldata = '0xa7867212' + hash.slice(2).padStart(64, '0');
-  console.log(chalk.white(`  curl -X POST ${options.rpc} \\`));
-  console.log(chalk.white(`    -H "Content-Type: application/json" \\`));
-  console.log(chalk.white(`    -d '{"jsonrpc":"2.0","id":1,"method":"eth_call","params":[{"to":"${contractAddress}","data":"${calldata}"},"latest"]}'`));
+  console.log(chalk.gray('  ') + chalk.white(`curl -X POST ${options.rpc} \\`));
+  console.log(chalk.gray('    ') + chalk.white(`-H "Content-Type: application/json" \\`));
+  console.log(chalk.gray('    ') + chalk.white(`-d '{"jsonrpc":"2.0","id":1,"method":"eth_call",`));
+  console.log(chalk.gray('    ') + chalk.white(`    "params":[{"to":"${contractAddress}",`));
+  console.log(chalk.gray('    ') + chalk.white(`    "data":"${calldata}"},"latest"]}'`));
   console.log();
 
-  console.log(chalk.dim('Using ethers.js:'));
-  console.log(chalk.white(`  const provider = new ethers.JsonRpcProvider("${options.rpc}");`));
-  console.log(chalk.white(`  const contract = new ethers.Contract("${contractAddress}", ABI, provider);`));
-  console.log(chalk.white(`  const isValid = await contract.verifyIdentity("${hash}");`));
+  console.log(chalk.bold.yellow('Method 3: Using ethers.js'));
+  console.log(chalk.dim('For JavaScript/TypeScript applications'));
+  console.log();
+  console.log(chalk.gray('  ') + chalk.white(`const { ethers } = require('ethers');`));
+  console.log(chalk.gray('  ') + chalk.white(`const provider = new ethers.JsonRpcProvider("${options.rpc}");`));
+  console.log(chalk.gray('  ') + chalk.white(`const abi = ['function verifyIdentity(bytes32) view returns (bool)'];`));
+  console.log(chalk.gray('  ') + chalk.white(`const contract = new ethers.Contract("${contractAddress}", abi, provider);`));
+  console.log(chalk.gray('  ') + chalk.white(`const isValid = await contract.verifyIdentity("${hash}");`));
+  console.log(chalk.gray('  ') + chalk.white(`console.log(isValid ? 'VALID' : 'INVALID');`));
   console.log();
 
-  console.log(chalk.dim('Block explorer:'));
-  console.log(chalk.cyan(`  https://basescan.org/address/${contractAddress}#readContract`));
+  console.log(chalk.bold.yellow('Method 4: Block Explorer'));
+  console.log(chalk.dim('Visual verification via Basescan'));
+  console.log();
+  console.log(chalk.gray('  ') + chalk.cyan(`https://basescan.org/address/${contractAddress}#readContract`));
+  console.log(chalk.gray('  ') + chalk.dim('Enter the hash in the verifyIdentity function'));
   console.log();
 
-  console.log(chalk.dim('─'.repeat(50)));
-  console.log(chalk.dim('AgentID acts as a notary. The blockchain is the source of truth.'));
+  console.log(chalk.dim('─'.repeat(60)));
+  console.log();
+  console.log(chalk.bold('Understanding Results:'));
+  console.log();
+  console.log(chalk.green('  • 0x01 or true  ') + chalk.dim('= Identity is VALID (anchored and not revoked)'));
+  console.log(chalk.red('  • 0x00 or false ') + chalk.dim('= Identity is INVALID (not found or revoked)'));
+  console.log();
+  console.log(chalk.dim('─'.repeat(60)));
+  console.log();
+  console.log(chalk.dim('AgentID serves as a notary service. The blockchain is the'));
+  console.log(chalk.dim('ultimate source of truth - no trust in third parties required.'));
   console.log();
 }

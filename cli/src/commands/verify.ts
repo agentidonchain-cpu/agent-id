@@ -17,25 +17,31 @@ interface VerifyOptions {
 
 export async function verify(identityHash: string, options: VerifyOptions): Promise<void> {
   console.log();
-  console.log(chalk.bold('AgentID - Verify Identity'));
-  console.log(chalk.dim('─'.repeat(40)));
+  console.log(chalk.bold.green('╔════════════════════════════════════════════════════════════╗'));
+  console.log(chalk.bold.green('║') + chalk.bold('           AgentID - Verify Agent Identity                ') + chalk.bold.green('║'));
+  console.log(chalk.bold.green('╚════════════════════════════════════════════════════════════╝'));
+  console.log();
+  console.log(chalk.white('This command verifies an agent\'s identity directly on the Base blockchain.'));
+  console.log(chalk.white('No API or third-party trust required - fully decentralized verification.'));
+  console.log();
+  console.log(chalk.dim('─'.repeat(60)));
   console.log();
 
   // Normalize hash
   const hash = identityHash.startsWith('0x') ? identityHash : `0x${identityHash}`;
   const contractAddress = options.contract || DEFAULT_CONTRACT;
 
-  console.log(chalk.dim('Identity Hash:'));
-  console.log(chalk.cyan(hash));
+  console.log(chalk.bold.cyan('VERIFICATION REQUEST'));
   console.log();
-  console.log(chalk.dim('Contract:'));
-  console.log(chalk.cyan(contractAddress));
+  console.log(chalk.dim('  Identity Hash: ') + chalk.cyan(hash));
+  console.log(chalk.dim('  Contract:      ') + chalk.white(contractAddress));
+  console.log(chalk.dim('  Chain:         ') + chalk.white('Base Mainnet (8453)'));
+  console.log(chalk.dim('  RPC:           ') + chalk.white(options.rpc));
   console.log();
-  console.log(chalk.dim('RPC:'));
-  console.log(chalk.cyan(options.rpc));
+  console.log(chalk.dim('─'.repeat(60)));
   console.log();
 
-  const spinner = ora('Querying blockchain').start();
+  const spinner = ora('Querying Base blockchain...').start();
 
   try {
     const result = await verifyOnChain(hash, contractAddress, options.rpc);
@@ -43,39 +49,87 @@ export async function verify(identityHash: string, options: VerifyOptions): Prom
     if (result.exists) {
       spinner.succeed('Identity found on-chain');
       console.log();
+      console.log(chalk.dim('─'.repeat(60)));
+      console.log();
 
       if (result.valid) {
-        console.log(chalk.bold.green('Status: VALID'));
+        console.log(chalk.bold.green('╔════════════════════════════════════════════════════════════╗'));
+        console.log(chalk.bold.green('║') + chalk.bold.green('                    ✓ IDENTITY VALID                        ') + chalk.bold.green('║'));
+        console.log(chalk.bold.green('╚════════════════════════════════════════════════════════════╝'));
       } else {
-        console.log(chalk.bold.red('Status: REVOKED'));
+        console.log(chalk.bold.red('╔════════════════════════════════════════════════════════════╗'));
+        console.log(chalk.bold.red('║') + chalk.bold.red('                    ✗ IDENTITY REVOKED                       ') + chalk.bold.red('║'));
+        console.log(chalk.bold.red('╚════════════════════════════════════════════════════════════╝'));
       }
 
       console.log();
-      console.log(chalk.dim('Creator:'));
-      console.log(result.creator);
+      console.log(chalk.bold('On-Chain Details:'));
       console.log();
-      console.log(chalk.dim('Anchored:'));
-      console.log(new Date(result.anchoredAt * 1000).toISOString());
+      console.log(chalk.dim('  Status:   ') + (result.valid ? chalk.green('VALID') : chalk.red('REVOKED')));
+      console.log(chalk.dim('  Creator:  ') + chalk.white(result.creator));
+      console.log(chalk.dim('  Anchored: ') + chalk.white(new Date(result.anchoredAt * 1000).toISOString()));
 
       if (result.revokedAt) {
-        console.log();
-        console.log(chalk.dim('Revoked:'));
-        console.log(new Date(result.revokedAt * 1000).toISOString());
+        console.log(chalk.dim('  Revoked:  ') + chalk.red(new Date(result.revokedAt * 1000).toISOString()));
       }
-    } else {
-      spinner.warn('Identity not found on-chain');
-      console.log();
-      console.log(chalk.yellow('This identity has not been anchored.'));
-    }
 
-    console.log();
+      console.log();
+      console.log(chalk.dim('─'.repeat(60)));
+      console.log();
+      console.log(chalk.bold('What This Means:'));
+      console.log();
+      if (result.valid) {
+        console.log(chalk.green('  ✓ ') + chalk.white('This agent identity was registered on the blockchain'));
+        console.log(chalk.green('  ✓ ') + chalk.white('The identity hash has not been modified since anchoring'));
+        console.log(chalk.green('  ✓ ') + chalk.white('The identity has not been revoked by the creator'));
+      } else {
+        console.log(chalk.red('  ✗ ') + chalk.white('This identity was revoked by its creator'));
+        console.log(chalk.red('  ✗ ') + chalk.white('The agent may have been updated or deprecated'));
+      }
+
+      console.log();
+      console.log(chalk.dim('─'.repeat(60)));
+      console.log();
+      console.log(chalk.bold('Verification Links:'));
+      console.log();
+      console.log(chalk.dim('  Web:      ') + chalk.cyan('https://id-agent.org/verify/' + hash));
+      console.log(chalk.dim('  Basescan: ') + chalk.cyan('https://basescan.org/address/' + contractAddress + '#readContract'));
+      console.log();
+
+    } else {
+      spinner.warn('Identity NOT found on-chain');
+      console.log();
+      console.log(chalk.dim('─'.repeat(60)));
+      console.log();
+      console.log(chalk.bold.yellow('╔════════════════════════════════════════════════════════════╗'));
+      console.log(chalk.bold.yellow('║') + chalk.bold.yellow('                  IDENTITY NOT ANCHORED                     ') + chalk.bold.yellow('║'));
+      console.log(chalk.bold.yellow('╚════════════════════════════════════════════════════════════╝'));
+      console.log();
+      console.log(chalk.yellow('This identity hash was not found on the Base blockchain.'));
+      console.log();
+      console.log(chalk.dim('Possible reasons:'));
+      console.log(chalk.dim('  • The agent has not been anchored yet'));
+      console.log(chalk.dim('  • The identity hash is incorrect'));
+      console.log(chalk.dim('  • The agent was registered on a different network'));
+      console.log();
+      console.log(chalk.dim('If you own this agent, anchor it with:'));
+      console.log(chalk.cyan('  npx agentidbase anchor ' + hash));
+      console.log();
+    }
 
   } catch (error: any) {
     spinner.fail('Verification failed');
-    console.log(chalk.red(error.message));
     console.log();
-    console.log(chalk.dim('Manual verification:'));
-    console.log(chalk.cyan(`cast call ${contractAddress} "verifyIdentity(bytes32)" ${hash} --rpc-url ${options.rpc}`));
+    console.log(chalk.red('Error: ' + error.message));
+    console.log();
+    console.log(chalk.dim('Troubleshooting:'));
+    console.log(chalk.dim('  • Check that the identity hash is valid (0x + 64 hex chars)'));
+    console.log(chalk.dim('  • Verify your internet connection'));
+    console.log(chalk.dim('  • Try an alternative RPC endpoint'));
+    console.log();
+    console.log(chalk.dim('Manual verification using Foundry cast:'));
+    console.log(chalk.cyan(`  cast call ${contractAddress} "verifyIdentity(bytes32)" ${hash} --rpc-url ${options.rpc}`));
+    console.log();
     process.exit(1);
   }
 }

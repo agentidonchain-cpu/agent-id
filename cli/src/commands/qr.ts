@@ -22,6 +22,17 @@ interface QROptions {
 const SITE_URL = 'https://id-agent.org';
 
 export async function qr(identityHash: string, options: QROptions) {
+  console.log();
+  console.log(chalk.bold.green('╔════════════════════════════════════════════════════════════╗'));
+  console.log(chalk.bold.green('║') + chalk.bold('           AgentID - Generate Verification QR Code          ') + chalk.bold.green('║'));
+  console.log(chalk.bold.green('╚════════════════════════════════════════════════════════════╝'));
+  console.log();
+  console.log(chalk.white('This generates a QR code that links to your agent\'s verification page.'));
+  console.log(chalk.white('Anyone who scans it can instantly verify your agent on the blockchain.'));
+  console.log();
+  console.log(chalk.dim('─'.repeat(60)));
+  console.log();
+
   const spinner = ora('Generating QR code...').start();
 
   try {
@@ -69,17 +80,28 @@ export async function qr(identityHash: string, options: QROptions) {
     spinner.succeed('QR code generated successfully!');
 
     // Success output
-    console.log('');
-    console.log(chalk.green('✓ QR Code Details:'));
-    console.log(chalk.gray('─'.repeat(60)));
-    console.log(chalk.cyan('  Identity Hash:'), chalk.white(identityHash));
-    console.log(chalk.cyan('  Verify URL:   '), chalk.white(verifyUrl));
-    console.log(chalk.cyan('  Image Size:   '), chalk.white(`${qrSize}x${qrSize}`));
-    console.log(chalk.cyan('  Saved to:     '), chalk.white(outputPath));
-    console.log(chalk.gray('─'.repeat(60)));
-    console.log('');
-    console.log(chalk.green('Scan this QR code to verify the agent on-chain!'));
-    console.log('');
+    console.log();
+    console.log(chalk.dim('─'.repeat(60)));
+    console.log();
+    console.log(chalk.bold.green('╔════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.bold.green('║') + chalk.bold.green('             ✓ QR CODE GENERATED SUCCESSFULLY               ') + chalk.bold.green('║'));
+    console.log(chalk.bold.green('╚════════════════════════════════════════════════════════════╝'));
+    console.log();
+    console.log(chalk.bold('QR Code Details:'));
+    console.log();
+    console.log(chalk.dim('  Identity Hash: ') + chalk.cyan(identityHash));
+    console.log(chalk.dim('  Verify URL:    ') + chalk.white(verifyUrl));
+    console.log(chalk.dim('  Image Size:    ') + chalk.white(`${qrSize}x${qrSize} pixels`));
+    console.log(chalk.dim('  Saved to:      ') + chalk.white(outputPath));
+    console.log();
+    console.log(chalk.dim('─'.repeat(60)));
+    console.log();
+    console.log(chalk.bold('How to use this QR code:'));
+    console.log();
+    console.log(chalk.white('  1. ') + chalk.dim('Include it in your agent\'s UI or documentation'));
+    console.log(chalk.white('  2. ') + chalk.dim('Users scan it to verify your agent on id-agent.org'));
+    console.log(chalk.white('  3. ') + chalk.dim('Verification is performed directly on Base blockchain'));
+    console.log();
 
     // Print QR code to terminal (ASCII version)
     try {

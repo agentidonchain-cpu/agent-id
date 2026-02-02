@@ -1,22 +1,127 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 
 const CONTRACT_ADDRESS = "0x471C4c43672be2d49A2ceC79203c23b7194A22Fa";
 const RPC_URL = "https://mainnet.base.org";
 const CHAIN = "Base Mainnet";
 const CHAIN_ID = "8453";
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "wss://agent007-api-production.up.railway.app/ws";
+
+// Types for WebSocket events
+interface AgentEvent {
+  id: string;
+  type: 'registered' | 'anchored';
+  identityHash: string;
+  displayName: string;
+  provider?: string;
+  timestamp: Date;
+}
 
 export default function Home() {
   const [stats, setStats] = useState({ anchored: 0, active: 0 });
   const [copied, setCopied] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const [isLive, setIsLive] = useState(false);
+  const [recentAgents, setRecentAgents] = useState<AgentEvent[]>([]);
+  const [animatedCount, setAnimatedCount] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch stats directly from blockchain
+  // Animate counter
+  useEffect(() => {
+    if (stats.anchored === 0) return;
+
+    const duration = 1500;
+    const steps = 30;
+    const increment = stats.anchored / steps;
+    let current = 0;
+
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= stats.anchored) {
+        setAnimatedCount(stats.anchored);
+        clearInterval(timer);
+      } else {
+        setAnimatedCount(Math.floor(current));
+      }
+    }, duration / steps);
+
+    return () => clearInterval(timer);
+  }, [stats.anchored]);
+
+  // WebSocket connection
+  const connectWebSocket = useCallback(() => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+    try {
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setIsLive(true);
+        // Subscribe to stats and all channels
+        ws.send(JSON.stringify({ action: 'subscribe', channel: 'stats' }));
+        ws.send(JSON.stringify({ action: 'subscribe', channel: 'all' }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+
+          if (message.type === 'stats.update') {
+            setStats({
+              anchored: message.data.totalAnchored || message.data.totalAgents || 0,
+              active: message.data.totalAgents || 0,
+            });
+            setLastUpdate(new Date());
+          }
+
+          if (message.type === 'agent.registered' || message.type === 'agent.anchored') {
+            const newAgent: AgentEvent = {
+              id: message.data.identityHash + Date.now(),
+              type: message.type === 'agent.registered' ? 'registered' : 'anchored',
+              identityHash: message.data.identityHash,
+              displayName: message.data.displayName || 'Unknown Agent',
+              provider: message.data.provider,
+              timestamp: new Date(message.timestamp),
+            };
+
+            setRecentAgents(prev => [newAgent, ...prev].slice(0, 10));
+
+            // Update stats immediately for new registrations
+            if (message.type === 'agent.registered') {
+              setStats(prev => ({ ...prev, active: prev.active + 1 }));
+            }
+            if (message.type === 'agent.anchored') {
+              setStats(prev => ({ ...prev, anchored: prev.anchored + 1 }));
+            }
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      };
+
+      ws.onclose = () => {
+        setIsLive(false);
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectWebSocket();
+        }, 5000);
+      };
+
+      ws.onerror = () => {
+        setIsLive(false);
+      };
+    } catch (e) {
+      setIsLive(false);
+    }
+  }, []);
+
+  // Fetch stats directly from blockchain (fallback)
   useEffect(() => {
     const fetchOnChainStats = async () => {
       try {
-        // Call getStats() on the contract - returns (anchored, revoked, active)
         const data = "0xc59d4847"; // getStats() selector
 
         const response = await fetch(RPC_URL, {
@@ -46,9 +151,23 @@ export default function Home() {
     };
 
     fetchOnChainStats();
-    const interval = setInterval(fetchOnChainStats, 15000); // Update every 15s
+    const interval = setInterval(fetchOnChainStats, 30000); // Update every 30s (WebSocket handles real-time)
     return () => clearInterval(interval);
   }, []);
+
+  // Connect WebSocket on mount
+  useEffect(() => {
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [connectWebSocket]);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -56,17 +175,25 @@ export default function Home() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const formatTimeAgo = (date: Date) => {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#262626] bg-[#0a0a0a]/90 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-lg font-semibold tracking-tight">AgentID</span>
-            {stats.anchored > 0 && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 text-xs text-[#525252] bg-[#171717] rounded-full border border-[#262626]">
-                <span className="w-1 h-1 bg-[#22c55e] rounded-full animate-pulse" />
-                {stats.anchored} agents
+            {isLive && (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs text-[#22c55e] bg-[#22c55e]/10 rounded-full border border-[#22c55e]/30">
+                <span className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
+                LIVE
               </span>
             )}
           </div>
@@ -79,23 +206,155 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 pt-32 pb-20">
-        {/* Hero Section */}
-        <section className="py-20">
-          <h1 className="text-4xl md:text-5xl font-semibold tracking-tight mb-4">
-            AgentID
-          </h1>
-          <p className="text-xl text-[#737373] mb-2">
-            Cryptographic identity for AI agents.
-          </p>
-          <p className="text-[#737373] max-w-xl mb-6">
-            Register, fingerprint and verify AI agents on-chain.<br />
-            No platform trust required.
-          </p>
+      <main className="max-w-7xl mx-auto px-6 pt-32 pb-20">
+        {/* Hero Section with Counter */}
+        <section className="py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2">
+              <h1 className="text-4xl md:text-5xl font-semibold tracking-tight mb-4">
+                AgentID
+              </h1>
+              <p className="text-xl text-[#737373] mb-2">
+                Cryptographic identity for AI agents.
+              </p>
+              <p className="text-[#737373] max-w-xl mb-8">
+                Register, fingerprint and verify AI agents on-chain.<br />
+                No platform trust required.
+              </p>
 
-          {/* Why AgentID */}
-          <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 max-w-xl">
-            <p className="text-sm text-[#a3a3a3] leading-relaxed">
+              {/* Prominent Counter */}
+              <div className="bg-gradient-to-br from-[#171717] to-[#0f0f0f] border border-[#262626] rounded-2xl p-8 mb-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-[#22c55e]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+                <div className="relative">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-sm text-[#737373] uppercase tracking-wider">Verified Agents</span>
+                    {isLive && (
+                      <span className="flex items-center gap-1.5 text-xs text-[#22c55e]">
+                        <span className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
+                        Live
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-6xl md:text-7xl font-bold text-[#e5e5e5] tabular-nums">
+                      {animatedCount}
+                    </span>
+                    <span className="text-xl text-[#525252]">agents</span>
+                  </div>
+                  <div className="flex items-center gap-4 mt-4 text-sm">
+                    <span className="text-[#22c55e] flex items-center gap-1.5">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      On-chain verified
+                    </span>
+                    <span className="text-[#737373]">on {CHAIN}</span>
+                  </div>
+                  {lastUpdate && (
+                    <div className="mt-3 text-xs text-[#525252]">
+                      Last sync: {lastUpdate.toLocaleTimeString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* CLI Command */}
+              <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 mb-6 group relative">
+                <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase register</code>
+                <button
+                  onClick={() => copyToClipboard("npx agentidbase register", "cli")}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#737373] hover:text-[#e5e5e5] transition-colors opacity-0 group-hover:opacity-100"
+                >
+                  {copied === "cli" ? "copied" : "copy"}
+                </button>
+              </div>
+
+              <p className="text-[#737373] text-sm">
+                Register your agent in one command. Free gas. No UI required.
+              </p>
+            </div>
+
+            {/* Live Feed Sidebar */}
+            <div className="lg:col-span-1">
+              <div className="bg-[#171717] border border-[#262626] rounded-2xl p-5 sticky top-28">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-[#e5e5e5] uppercase tracking-wider">Live Feed</h3>
+                  {isLive ? (
+                    <span className="flex items-center gap-1.5 text-xs text-[#22c55e]">
+                      <span className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
+                      Connected
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-xs text-[#737373]">
+                      <span className="w-1.5 h-1.5 bg-[#737373] rounded-full" />
+                      Connecting...
+                    </span>
+                  )}
+                </div>
+
+                {recentAgents.length > 0 ? (
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {recentAgents.map((agent, index) => (
+                      <a
+                        key={agent.id}
+                        href={`/verify/${agent.identityHash}`}
+                        className={`block p-3 rounded-lg border transition-all hover:border-[#22c55e]/50 ${
+                          index === 0 ? 'bg-[#22c55e]/5 border-[#22c55e]/20 animate-slide-in' : 'bg-[#0f0f0f] border-[#262626]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            agent.type === 'registered'
+                              ? 'bg-blue-500/20 text-blue-400'
+                              : 'bg-[#22c55e]/20 text-[#22c55e]'
+                          }`}>
+                            {agent.type === 'registered' ? 'NEW' : 'ANCHORED'}
+                          </span>
+                          <span className="text-xs text-[#525252]">
+                            {formatTimeAgo(agent.timestamp)}
+                          </span>
+                        </div>
+                        <div className="text-sm text-[#a3a3a3] truncate font-mono">
+                          {agent.identityHash.slice(0, 10)}...{agent.identityHash.slice(-8)}
+                        </div>
+                        {agent.displayName && agent.displayName !== 'Unknown Agent' && (
+                          <div className="text-xs text-[#525252] truncate mt-1">
+                            {agent.displayName}
+                          </div>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-[#525252] text-sm mb-2">Waiting for activity...</div>
+                    <div className="text-[#3f3f3f] text-xs">New agents will appear here in real-time</div>
+                  </div>
+                )}
+
+                <div className="mt-4 pt-4 border-t border-[#262626]">
+                  <a
+                    href="/agents"
+                    className="text-sm text-[#22c55e] hover:text-[#4ade80] transition-colors flex items-center gap-1"
+                  >
+                    View all agents
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="border-t border-[#262626] my-12" />
+
+        {/* Why AgentID */}
+        <section className="py-12">
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 max-w-3xl">
+            <p className="text-[#a3a3a3] leading-relaxed">
               <span className="text-[#e5e5e5] font-medium">Why AgentID?</span> As AI agents proliferate,
               there&apos;s no standard way to verify their identity or authenticity. Anyone can claim
               to be any agent. AgentID solves this by creating a cryptographic fingerprint of each
@@ -103,21 +362,6 @@ export default function Home() {
               identity that anyone can verify, without trusting a central authority.
             </p>
           </div>
-
-          {/* Live Stats - Discrete counter */}
-          {stats.anchored > 0 && (
-            <div className="mt-8 flex items-center gap-6 text-sm text-[#525252]">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
-                <span>{stats.anchored} verified on-chain</span>
-              </div>
-              {lastUpdate && (
-                <span className="text-xs">
-                  updated {lastUpdate.toLocaleTimeString()}
-                </span>
-              )}
-            </div>
-          )}
         </section>
 
         <div className="border-t border-[#262626] my-12" />
@@ -126,23 +370,13 @@ export default function Home() {
         <section className="py-12">
           <h2 className="text-2xl font-semibold mb-8">Register your agent via terminal</h2>
 
-          <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 mb-6 group relative">
-            <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase register</code>
-            <button
-              onClick={() => copyToClipboard("npx agentidbase register", "cli")}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#737373] hover:text-[#e5e5e5] transition-colors opacity-0 group-hover:opacity-100"
-            >
-              {copied === "cli" ? "copied" : "copy"}
-            </button>
-          </div>
-
           <p className="text-[#737373] text-sm mb-6">
             This command generates a cryptographic identity for your agent
             and anchors it on {CHAIN}.<br />
             No UI. No lock-in. No hidden state.
           </p>
 
-          <ul className="space-y-2 text-sm text-[#737373]">
+          <ul className="space-y-2 text-sm text-[#737373] mb-8">
             <li className="flex items-start gap-2">
               <span className="text-[#22c55e] mt-0.5">-</span>
               Generates a deterministic identity hash
@@ -162,7 +396,7 @@ export default function Home() {
           </ul>
 
           {/* All CLI Commands */}
-          <div className="mt-8 grid gap-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
               <span className="text-[#737373]"># Initialize config</span><br />
               <code className="text-[#22c55e]">npx agentidbase init</code>
@@ -255,7 +489,7 @@ export default function Home() {
           <h2 className="text-2xl font-semibold mb-8">Every agent has a public identity</h2>
 
           <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 mb-6">
-            <code className="text-[#737373] text-sm">https://id-agent.org/agents/</code>
+            <code className="text-[#737373] text-sm">https://id-agent.org/verify/</code>
             <code className="text-[#22c55e] text-sm">0x7f83b166...</code>
           </div>
 
@@ -312,7 +546,7 @@ export default function Home() {
         <section className="py-12">
           <h2 className="text-2xl font-semibold mb-8">Technical details</h2>
 
-          <div className="grid gap-4 text-sm">
+          <div className="grid gap-4 text-sm max-w-2xl">
             <div className="flex justify-between border-b border-[#262626] pb-2">
               <span className="text-[#737373]">Hash algorithm</span>
               <span>SHA-256</span>
@@ -432,7 +666,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-[#262626] py-12">
-        <div className="max-w-5xl mx-auto px-6">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <p className="text-[#737373] text-sm">
@@ -448,6 +682,7 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
     </div>
   );
 }

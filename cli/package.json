@@ -1,6 +1,6 @@
 {
   "name": "agentidbase",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "CLI for registering and verifying AI agent identities on-chain",
   "type": "module",
   "bin": {
@@ -27,6 +27,7 @@
     "commander": "^12.0.0",
     "ethers": "^6.0.0",
     "inquirer": "^9.2.0",
+    "open": "^11.0.0",
     "ora": "^8.0.0",
     "qrcode": "^1.5.4"
   },
