@@ -13,6 +13,13 @@ const CONTRACT_ADDRESS = '0x471C4c43672be2d49A2ceC79203c23b7194A22Fa';
 const BASESCAN_URL = 'https://basescan.org';
 const RPC_URL = 'https://mainnet.base.org';
 
+interface TwitterVerification {
+  handle: string;
+  userId: string;
+  verifiedAt: string;
+  proofUrl: string;
+}
+
 interface AgentData {
   identityHash: string;
   creator: string;
@@ -28,6 +35,8 @@ interface AgentData {
   // On-chain fields
   txHash?: string;
   blockNumber?: number;
+  // Twitter verification
+  twitter?: TwitterVerification;
 }
 
 const API_URL = 'https://agent007-api-production.up.railway.app';
@@ -51,6 +60,21 @@ export default function VerifyPage() {
           const apiData = await apiResponse.json();
           if (apiData.success && apiData.data) {
             const d = apiData.data;
+
+            // Fetch Twitter verification separately
+            let twitter: TwitterVerification | undefined;
+            try {
+              const twitterRes = await fetch(`${API_URL}/api/v1/verify/twitter/${hash}`);
+              if (twitterRes.ok) {
+                const twitterData = await twitterRes.json();
+                if (twitterData.success && twitterData.data?.verified) {
+                  twitter = twitterData.data.twitter;
+                }
+              }
+            } catch (e) {
+              console.log('No Twitter verification found');
+            }
+
             setAgent({
               identityHash: hash,
               creator: d.anchor?.txHash ? 'On-chain' : 'API Registered',
@@ -64,6 +88,7 @@ export default function VerifyPage() {
               trustDescription: d.trustDescription,
               txHash: d.anchor?.txHash,
               blockNumber: d.anchor?.blockNumber,
+              twitter,
             });
             setLoading(false);
             return;
@@ -355,6 +380,49 @@ export default function VerifyPage() {
                 <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
                   <dt className="text-xs text-green-300 mb-1">Trust Level</dt>
                   <dd className="text-sm text-green-400">{agent.trustDescription}</dd>
+                </div>
+              )}
+
+              {/* Twitter Verification */}
+              {agent.twitter ? (
+                <div className="border border-[#1DA1F2]/30 rounded-lg p-3 bg-[#1DA1F2]/10">
+                  <dt className="text-xs text-[#1DA1F2] mb-1 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    Twitter Verified
+                  </dt>
+                  <dd className="text-sm">
+                    <a
+                      href={agent.twitter.proofUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#1DA1F2] hover:underline font-medium"
+                    >
+                      {agent.twitter.handle}
+                    </a>
+                    <span className="text-green-400/60 text-xs ml-2">
+                      verified {new Date(agent.twitter.verifiedAt).toLocaleDateString()}
+                    </span>
+                  </dd>
+                </div>
+              ) : (
+                <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
+                  <dt className="text-xs text-green-300 mb-2">Twitter</dt>
+                  <dd>
+                    <a
+                      href={`/verify/twitter?hash=${hash}`}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-[#1DA1F2]/20 hover:bg-[#1DA1F2]/30 border border-[#1DA1F2]/30 rounded-lg text-[#1DA1F2] text-sm transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      Verify Twitter
+                    </a>
+                    <p className="text-xs text-green-400/50 mt-2">
+                      Link your Twitter to increase trust score
+                    </p>
+                  </dd>
                 </div>
               )}
             </div>
