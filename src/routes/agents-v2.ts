@@ -927,6 +927,242 @@ router.post(
 );
 
 // =============================================================================
+// ROUTE: POST /agents/openclaw (OpenClaw Integration)
+// Accepts OpenClaw config format directly for seamless integration
+// =============================================================================
+
+const openclawSchema = z.object({
+  // Source identification
+  source: z.literal('openclaw').default('openclaw'),
+  version: z.string().default('1.0'),
+
+  // Agent configuration (OpenClaw format)
+  agent: z.object({
+    name: z.string().min(1).max(100),
+    model: z.string().min(1).max(200), // Format: "provider/model-id" e.g. "anthropic/claude-opus-4-5"
+    skills: z.array(z.string().max(100)).max(50).optional(),
+    capabilities: z.array(z.string().max(200)).max(20).optional(),
+    systemPromptHash: z.string().optional(), // SHA256 hash of system prompt
+    thinkingLevel: z.enum(['none', 'low', 'medium', 'high']).optional(),
+    endpoint: z.string().url().optional(), // Gateway endpoint if exposed
+  }),
+
+  // Signature (supports both wallet and agent keypair)
+  signature: z.object({
+    type: z.nativeEnum(SignatureType),
+    value: z.string(),
+    publicKey: z.string().optional(),
+    timestamp: z.string(),
+  }).optional(),
+
+  // Optional wallet address for human attestation
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+});
+
+router.post(
+  '/openclaw',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ip = req.ip || req.socket.remoteAddress || 'unknown';
+
+      // Rate limiting
+      if (!checkRateLimit(ip)) {
+        res.status(429).json({
+          success: false,
+          error: {
+            code: 'RATE_LIMITED',
+            message: 'Too many registrations. Try again later.',
+          },
+        });
+        return;
+      }
+
+      const parseResult = openclawSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        throw new ValidationError('Invalid request body', parseResult.error.flatten());
+      }
+
+      const data = parseResult.data;
+      const issuedAt = new Date().toISOString();
+
+      // Parse model string (format: "provider/model-id")
+      const modelParts = data.agent.model.split('/');
+      const provider = modelParts[0] || 'unknown';
+      const modelId = modelParts.slice(1).join('/') || data.agent.model;
+
+      // Determine identity type based on what's provided
+      let identityType: IdentityType;
+      let identityHash: string;
+
+      if (data.signature?.type === SignatureType.AGENT_KEYPAIR && data.signature.publicKey) {
+        // Self-claim: agent has its own keypair
+        identityType = IdentityType.SELF_CLAIM;
+        identityHash = generateSelfClaimHash(data.signature.publicKey);
+      } else if (data.agent.systemPromptHash) {
+        // Fingerprint: has config details
+        identityType = IdentityType.FINGERPRINT;
+        identityHash = generateFingerprintHash({
+          model: { provider, modelId },
+          systemPromptHash: data.agent.systemPromptHash,
+        });
+      } else {
+        // Attestation: basic declaration
+        identityType = IdentityType.ATTESTATION;
+        identityHash = generateAttestationHash({
+          agentName: data.agent.name,
+          platform: 'openclaw',
+          publicReference: data.agent.endpoint || `openclaw:${data.agent.name}`,
+          issuerType: data.signature?.type === SignatureType.HUMAN_WALLET ? IssuerType.HUMAN : IssuerType.AGENT,
+          issuedAt,
+        });
+      }
+
+      // Check if already exists
+      if (await identityExists(identityHash)) {
+        throw new ConflictError('Agent already registered with this configuration');
+      }
+
+      // Create signature object
+      const signature: Signature = data.signature || {
+        type: SignatureType.NONE,
+        value: '',
+        timestamp: issuedAt,
+      };
+
+      // Verify signature if provided
+      if (signature.type !== SignatureType.NONE) {
+        const message = `AgentID OpenClaw Registration\n\nAgent: ${data.agent.name}\nModel: ${data.agent.model}\nTimestamp: ${signature.timestamp}`;
+        const verification = await verifySignature(message, signature);
+        if (!verification.valid) {
+          throw new ValidationError(`Signature verification failed: ${verification.error}`);
+        }
+      }
+
+      // Build identity based on type
+      let identity: AttestationIdentity | FingerprintIdentity | SelfClaimIdentity;
+      const declaredCapabilities = [
+        ...(data.agent.capabilities || []),
+        ...(data.agent.skills || []).map(s => `skill:${s}`),
+      ];
+
+      if (identityType === IdentityType.SELF_CLAIM) {
+        identity = {
+          identityType: IdentityType.SELF_CLAIM,
+          identityHash,
+          agentName: data.agent.name,
+          publicKey: data.signature!.publicKey!,
+          declaredCapabilities,
+          signature,
+          issuedAt,
+          endpoint: data.agent.endpoint,
+        } as SelfClaimIdentity;
+      } else if (identityType === IdentityType.FINGERPRINT) {
+        identity = {
+          identityType: IdentityType.FINGERPRINT,
+          identityHash,
+          agentName: data.agent.name,
+          model: { provider, modelId },
+          systemPromptHash: data.agent.systemPromptHash,
+          configStored: false,
+          issuerType: data.signature?.type === SignatureType.HUMAN_WALLET ? IssuerType.HUMAN : IssuerType.AGENT,
+          signature,
+          issuedAt,
+        } as FingerprintIdentity;
+      } else {
+        identity = {
+          identityType: IdentityType.ATTESTATION,
+          identityHash,
+          agentName: data.agent.name,
+          platform: 'openclaw',
+          publicReference: data.agent.endpoint || `openclaw:${data.agent.name}`,
+          declaredCapabilities,
+          issuerType: data.signature?.type === SignatureType.HUMAN_WALLET ? IssuerType.HUMAN : IssuerType.AGENT,
+          signature,
+          issuedAt,
+          tags: ['openclaw', provider, ...(data.agent.skills || [])],
+        } as AttestationIdentity;
+      }
+
+      // Calculate trust score
+      let trustScore = 0.1;
+      if (signature.type === SignatureType.HUMAN_WALLET) trustScore = 0.5;
+      else if (signature.type === SignatureType.AGENT_KEYPAIR) trustScore = 0.3;
+      if (data.agent.systemPromptHash) trustScore += 0.1;
+      if (data.agent.skills && data.agent.skills.length > 0) trustScore += 0.05;
+
+      // Store identity
+      const stored: StoredIdentityV2 = {
+        id: uuidv4(),
+        identity,
+        status: ClaimStatus.ACTIVE,
+        trustScore: Math.min(trustScore, 1.0),
+        createdAt: issuedAt,
+        updatedAt: issuedAt,
+        version: 1,
+      };
+
+      await saveIdentity(stored);
+
+      // Auto-anchor on blockchain
+      autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
+
+      // Emit WebSocket event
+      try {
+        const wsService = getWebSocketService();
+        wsService.emitAgentRegistered({
+          identityHash,
+          displayName: data.agent.name,
+          provider: 'openclaw',
+          modelId: modelId,
+        });
+        wsService.emitStatsUpdate();
+      } catch (e) {
+        logger.warn({ error: e }, 'Failed to emit WebSocket event');
+      }
+
+      logger.info(
+        {
+          identityHash: identityHash.slice(0, 16) + '...',
+          agentName: data.agent.name,
+          source: 'openclaw',
+          identityType,
+        },
+        'OpenClaw agent registered'
+      );
+
+      // Return OpenClaw-friendly response
+      res.status(201).json({
+        success: true,
+        data: {
+          identityHash,
+          identityType,
+          agentName: data.agent.name,
+          model: { provider, modelId },
+          trustScore: stored.trustScore,
+          trustDescription: getTrustDescription(identity),
+          verifyUrl: `https://id-agent.org/verify/${identityHash}`,
+          apiUrl: `https://agent007-api-production.up.railway.app/api/v2/agents/${identityHash}`,
+          createdAt: issuedAt,
+          anchoring: 'in_progress',
+          // OpenClaw-specific helpers
+          badge: {
+            markdown: `[![AgentID Verified](https://id-agent.org/badge/${identityHash})](https://id-agent.org/verify/${identityHash})`,
+            html: `<a href="https://id-agent.org/verify/${identityHash}"><img src="https://id-agent.org/badge/${identityHash}" alt="AgentID Verified"/></a>`,
+          },
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+          source: 'openclaw',
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =============================================================================
 // ROUTE: GET /agents/stats (for homepage counter)
 // Must come before /:identityHash to avoid being caught by param route
 // =============================================================================

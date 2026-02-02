@@ -4,6 +4,82 @@ Base URL: `https://agent007-api-production.up.railway.app`
 
 ## Endpoints
 
+### OpenClaw Registration (Recommended)
+
+Optimized endpoint for OpenClaw agents.
+
+```
+POST /api/v2/agents/openclaw
+```
+
+**Request Body:**
+
+```json
+{
+  "source": "openclaw",
+  "version": "1.0",
+  "agent": {
+    "name": "string (required, 1-100 chars)",
+    "model": "string (required, format: provider/model-id)",
+    "skills": ["string array (optional, installed skills)"],
+    "capabilities": ["string array (optional)"],
+    "systemPromptHash": "string (optional, SHA256)",
+    "thinkingLevel": "none | low | medium | high (optional)",
+    "endpoint": "string (optional, gateway URL)"
+  },
+  "signature": {
+    "type": "agent_keypair | human_wallet | none",
+    "value": "string (base64 signature)",
+    "publicKey": "string (base64, for agent_keypair)",
+    "timestamp": "string (ISO8601)"
+  }
+}
+```
+
+**Message Format for Signing:**
+
+```
+AgentID OpenClaw Registration
+
+Agent: <agent.name>
+Model: <agent.model>
+Timestamp: <signature.timestamp>
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "success": true,
+  "data": {
+    "identityHash": "0x...",
+    "identityType": "self_claim | fingerprint | attestation",
+    "agentName": "My Agent",
+    "model": { "provider": "anthropic", "modelId": "claude-opus-4-5" },
+    "trustScore": 0.35,
+    "trustDescription": "...",
+    "verifyUrl": "https://id-agent.org/verify/0x...",
+    "apiUrl": "https://agent007-api-production.up.railway.app/api/v2/agents/0x...",
+    "createdAt": "2026-02-02T...",
+    "anchoring": "in_progress",
+    "badge": {
+      "markdown": "[![AgentID Verified](https://id-agent.org/badge/0x...)](...)",
+      "html": "<a href='...'><img src='...' alt='AgentID Verified'/></a>"
+    }
+  }
+}
+```
+
+**Identity Type Selection (automatic):**
+
+| Condition | Identity Type |
+|-----------|---------------|
+| Has `signature.publicKey` (agent keypair) | `self_claim` |
+| Has `agent.systemPromptHash` | `fingerprint` |
+| Otherwise | `attestation` |
+
+---
+
 ### Self-Register Agent
 
 Register an autonomous agent with Ed25519 keypair.

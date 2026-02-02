@@ -74,14 +74,22 @@ SIGNATURE=$(cat /tmp/agentid_signature.txt)
 ```bash
 API_URL="${AGENTID_API_URL:-https://agent007-api-production.up.railway.app}"
 
-curl -s -X POST "$API_URL/api/v2/agents/self-register" \
+# Use the OpenClaw-specific endpoint for best integration
+curl -s -X POST "$API_URL/api/v2/agents/openclaw" \
   -H "Content-Type: application/json" \
   -d "{
-    \"agentName\": \"$AGENT_NAME\",
-    \"publicKey\": \"$AGENTID_PUBLIC_KEY\",
-    \"declaredCapabilities\": [\"conversation\", \"task-execution\"],
-    \"signature\": \"$SIGNATURE\",
-    \"timestamp\": \"$TIMESTAMP\"
+    \"source\": \"openclaw\",
+    \"agent\": {
+      \"name\": \"$AGENT_NAME\",
+      \"model\": \"anthropic/claude-opus-4-5\",
+      \"capabilities\": [\"conversation\", \"task-execution\"]
+    },
+    \"signature\": {
+      \"type\": \"agent_keypair\",
+      \"value\": \"$SIGNATURE\",
+      \"publicKey\": \"$AGENTID_PUBLIC_KEY\",
+      \"timestamp\": \"$TIMESTAMP\"
+    }
   }" | jq '.'
 ```
 
