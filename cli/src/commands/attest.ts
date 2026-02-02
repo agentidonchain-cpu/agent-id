@@ -383,18 +383,20 @@ async function registerAttestation(
     timestamp: string;
   }
 ): Promise<void> {
-  const response = await fetch(`${apiUrl}/api/v1/agents/register/attestation`, {
+  const response = await fetch(`${apiUrl}/api/v2/agents/attest`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      agentName: attestation.declaredName,
       platform: attestation.platform,
-      agentIdentifier: attestation.agentIdentifier,
-      declaredName: attestation.declaredName,
+      publicReference: attestation.agentIdentifier,
       declaredCapabilities: attestation.declaredCapabilities,
-      identityHash: signatureData.identityHash,
-      signature: signatureData.signature,
+      signature: {
+        type: 'human_wallet',
+        value: signatureData.signature,
+        timestamp: signatureData.timestamp,
+      },
       walletAddress: signatureData.walletAddress,
-      timestamp: signatureData.timestamp,
     }),
   });
 

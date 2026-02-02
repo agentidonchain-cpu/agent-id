@@ -9,6 +9,8 @@ import chalk from 'chalk';
 import { init } from './commands/init.js';
 import { register } from './commands/register.js';
 import { attest } from './commands/attest.js';
+import { define } from './commands/define.js';
+import { self } from './commands/self.js';
 import { anchor } from './commands/anchor.js';
 import { verify } from './commands/verify.js';
 import { proof } from './commands/proof.js';
@@ -32,8 +34,10 @@ ${chalk.bold.green('✓ FREE:')} Registration and on-chain anchoring are free - 
 
 ${chalk.bold('Quick Start:')}
   ${chalk.cyan('npx agentidbase init')}              Create agent.json config file
-  ${chalk.cyan('npx agentidbase register')}          Register with verified config (FREE)
-  ${chalk.cyan('npx agentidbase attest')}            Declare ownership (closed platforms)
+  ${chalk.cyan('npx agentidbase attest')}            ${chalk.yellow('(DEFAULT)')} Declare an agent exists
+  ${chalk.cyan('npx agentidbase define')}            Fingerprint from config (open agents)
+  ${chalk.cyan('npx agentidbase self')}              Agent self-registers (autonomous)
+  ${chalk.cyan('npx agentidbase register')}          Legacy registration
   ${chalk.cyan('npx agentidbase verify <hash>')}     Verify any agent identity
   ${chalk.cyan('npx agentidbase verify-twitter')}    Link Twitter to your agent
   ${chalk.cyan('npx agentidbase qr <hash>')}         Generate QR code for verification
@@ -61,12 +65,30 @@ program
 
 program
   .command('attest')
-  .description('Create attestation for closed platform agents (ChatGPT, etc.)')
+  .description('Create attestation for closed platform agents (ChatGPT, etc.) - DEFAULT')
   .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
   .option('-p, --platform <name>', 'Platform name (chatgpt, character.ai, etc.)')
   .option('-i, --id <identifier>', 'Agent URL or ID on the platform')
   .option('-n, --name <name>', 'Agent name')
   .action(attest);
+
+program
+  .command('define')
+  .description('Create fingerprint from agent config (for open/self-hosted agents)')
+  .option('-c, --config <path>', 'Path to agent.json config file')
+  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
+  .option('--store-config', 'Store full config for public verification')
+  .action(define);
+
+program
+  .command('self')
+  .description('Agent self-registers with Ed25519 keypair (autonomous agents)')
+  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
+  .option('-n, --name <name>', 'Agent name')
+  .option('-k, --keypair <path>', 'Path to keypair file (generates if not exists)')
+  .option('-e, --endpoint <url>', 'Agent endpoint URL')
+  .option('--no-pow', 'Skip proof of work')
+  .action(self);
 
 program
   .command('anchor <identityHash>')

@@ -13,6 +13,7 @@ import http from 'http';
 import { logger } from './utils/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import agentRoutes from './routes/agents.js';
+import agentRoutesV2 from './routes/agents-v2.js';
 import adminRoutes from './routes/admin.js';
 import multiAgentRoutes from './routes/multi-agent.js';
 import proxyRoutes from './routes/proxy.js';
@@ -154,6 +155,14 @@ app.get('/api/v1', (_req, res) => {
         list: 'GET /api/v1/agents',
         verification: 'POST /api/v1/agents/:identityHash/verification/schedule',
       },
+      agentsV2: {
+        attest: 'POST /api/v2/agents/attest',
+        selfRegister: 'POST /api/v2/agents/self-register',
+        fingerprint: 'POST /api/v2/agents/fingerprint',
+        get: 'GET /api/v2/agents/:identityHash',
+        proofs: 'GET /api/v2/agents/:identityHash/proofs',
+        list: 'GET /api/v2/agents',
+      },
       admin: {
         stats: 'GET /api/v1/admin/stats',
         agents: 'GET /api/v1/admin/agents',
@@ -193,8 +202,11 @@ app.get('/api/v1', (_req, res) => {
   });
 });
 
-// Agent routes
+// Agent routes (V1 - legacy)
 app.use('/api/v1/agents', agentRoutes);
+
+// Agent routes (V2 - new architecture with attestation, fingerprint, self-claim)
+app.use('/api/v2/agents', agentRoutesV2);
 
 // Admin routes
 app.use('/api/v1/admin', adminRoutes);

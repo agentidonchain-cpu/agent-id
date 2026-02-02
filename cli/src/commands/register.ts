@@ -317,8 +317,7 @@ async function signWithBrowser(identityHash: string, apiUrl: string): Promise<Si
 }
 
 async function promptConfig(): Promise<AgentConfig> {
-  console.log(chalk.bold.cyan('STEP 1/5: Agent Name'));
-  console.log(chalk.dim('What is your agent called?'));
+  console.log(chalk.bold.cyan('STEP 1/3: Agent Name'));
   console.log();
 
   const nameAnswer = await inquirer.prompt([
@@ -331,35 +330,20 @@ async function promptConfig(): Promise<AgentConfig> {
   ]);
 
   console.log();
-  console.log(chalk.bold.cyan('STEP 2/5: Description'));
-  console.log(chalk.dim('Briefly describe what your agent does.'));
-  console.log();
-
-  const descAnswer = await inquirer.prompt([
-    {
-      type: 'input',
-      name: 'description',
-      message: 'Description:',
-      default: 'An AI assistant',
-    },
-  ]);
-
-  console.log();
-  console.log(chalk.bold.cyan('STEP 3/5: Model Configuration'));
-  console.log(chalk.dim('Select your AI provider and model.'));
+  console.log(chalk.bold.cyan('STEP 2/3: Model'));
   console.log();
 
   const modelAnswer = await inquirer.prompt([
     {
       type: 'list',
       name: 'provider',
-      message: 'Model provider:',
+      message: 'Provider:',
       choices: [
         { name: 'Anthropic (Claude)', value: 'anthropic' },
         { name: 'OpenAI (GPT)', value: 'openai' },
         { name: 'Google (Gemini)', value: 'google' },
         { name: 'Mistral', value: 'mistral' },
-        { name: 'Other / Custom', value: 'custom' },
+        { name: 'Other', value: 'other' },
       ],
     },
     {
@@ -368,20 +352,19 @@ async function promptConfig(): Promise<AgentConfig> {
       message: 'Model ID:',
       default: (ans: { provider: string }) => {
         const defaults: Record<string, string> = {
-          anthropic: 'claude-3-5-sonnet-20241022',
-          openai: 'gpt-4-turbo',
-          google: 'gemini-pro',
-          mistral: 'mistral-large',
+          anthropic: 'claude-sonnet-4-20250514',
+          openai: 'gpt-4o',
+          google: 'gemini-2.0-flash',
+          mistral: 'mistral-large-latest',
         };
-        return defaults[ans.provider] || 'your-model-id';
+        return defaults[ans.provider] || '';
       },
     },
   ]);
 
   console.log();
-  console.log(chalk.bold.cyan('STEP 4/5: System Prompt'));
-  console.log(chalk.dim('Enter the system prompt that defines your agent\'s behavior.'));
-  console.log(chalk.yellow('TIP: For complex prompts, use "npx agentidbase init" first'));
+  console.log(chalk.bold.cyan('STEP 3/3: System Prompt (optional)'));
+  console.log(chalk.dim('Press Enter to skip.'));
   console.log();
 
   const promptAnswer = await inquirer.prompt([
@@ -389,27 +372,7 @@ async function promptConfig(): Promise<AgentConfig> {
       type: 'input',
       name: 'systemPrompt',
       message: 'System prompt:',
-      default: 'You are a helpful assistant.',
-    },
-  ]);
-
-  console.log();
-  console.log(chalk.bold.cyan('STEP 5/5: Generation Parameters'));
-  console.log(chalk.dim('Configure how your agent generates responses.'));
-  console.log();
-
-  const paramAnswer = await inquirer.prompt([
-    {
-      type: 'number',
-      name: 'temperature',
-      message: 'Temperature (0.0 - 1.0):',
-      default: 0.7,
-    },
-    {
-      type: 'number',
-      name: 'maxTokens',
-      message: 'Max tokens:',
-      default: 4096,
+      default: '',
     },
   ]);
 
@@ -417,15 +380,15 @@ async function promptConfig(): Promise<AgentConfig> {
 
   return {
     name: nameAnswer.name,
-    description: descAnswer.description,
+    description: '',
     model: {
       provider: modelAnswer.provider,
       modelId: modelAnswer.modelId,
     },
-    systemPrompt: promptAnswer.systemPrompt,
+    systemPrompt: promptAnswer.systemPrompt || 'AI assistant',
     parameters: {
-      temperature: paramAnswer.temperature,
-      maxTokens: paramAnswer.maxTokens,
+      temperature: 0.7,
+      maxTokens: 4096,
     },
   };
 }
