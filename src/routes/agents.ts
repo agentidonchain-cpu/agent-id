@@ -137,6 +137,23 @@ const getStorage = () => getAgentStorageService();
 
 const router = Router();
 
+// =============================================================================
+// DEPRECATION MIDDLEWARE
+// =============================================================================
+
+/**
+ * Adds deprecation headers to V1 endpoints that have V2 equivalents.
+ * This helps clients migrate to V2 gradually.
+ */
+const deprecationMiddleware = (equivalentEndpoint: string) => {
+  return (_req: Request, res: Response, next: NextFunction) => {
+    res.set('Deprecation', 'true');
+    res.set('Sunset', '2025-06-01'); // Planned sunset date
+    res.set('Link', `</api/v2${equivalentEndpoint}>; rel="successor-version"`);
+    next();
+  };
+};
+
 /**
  * POST /agents/register
  * Register a new agent identity
@@ -816,9 +833,11 @@ router.post(
 /**
  * GET /agents/:identityHash
  * Get agent identity details
+ * @deprecated Use GET /api/v2/agents/:identityHash instead
  */
 router.get(
   '/:identityHash',
+  deprecationMiddleware('/agents/:identityHash'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { identityHash } = req.params;
@@ -1000,9 +1019,11 @@ router.get(
 /**
  * GET /agents
  * List validated agents (with pagination)
+ * @deprecated Use GET /api/v2/agents instead
  */
 router.get(
   '/',
+  deprecationMiddleware('/agents'),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
