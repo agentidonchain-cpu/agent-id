@@ -3,7 +3,7 @@
  * Cryptographic utilities for attestation
  */
 
-import * as nacl from 'tweetnacl';
+import nacl from 'tweetnacl';
 import { createHash } from 'crypto';
 import type { RuntimeHashes, AgentConfig } from './types.js';
 
