@@ -99,6 +99,16 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
       }
 
       // Insert into agent_identities
+      // NOTE: owner_address is VARCHAR(42) for ETH addresses only
+      // For AGENT_KEYPAIR signatures, we store the public key in the bio JSON, not here
+      let ownerAddress: string | null = null;
+      if (stored.identity.signature.type === SignatureType.HUMAN_WALLET) {
+        // For wallet signatures, we need to recover the address from the signature
+        // But we don't have access to the message here, so we store null
+        // The actual address is stored in the full identity JSON in bio
+        ownerAddress = null;
+      }
+
       await query(
         `INSERT INTO agent_identities (
           id, identity_hash, creator_id, owner_address, status, created_at, validated_at
@@ -110,7 +120,7 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
           stored.id,
           stored.identity.identityHash,
           creatorId,
-          stored.identity.signature.publicKey || null,
+          ownerAddress,
           stored.status,
           stored.createdAt,
           stored.createdAt,
