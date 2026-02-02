@@ -25,11 +25,17 @@ import {
   SignatureType,
   ClaimStatus,
   type AttestationIdentity,
+  type ConfigIdentity,
   type FingerprintIdentity,
   type SelfClaimIdentity,
   type StoredIdentityV2,
   type Signature,
+  type VerificationSource,
   getTrustDescription,
+  calculateTrustScore,
+  getVerificationMessage,
+  isValidRegistrationSignature,
+  VALID_REGISTRATION_SIGNATURES,
 } from '../types/identity-v2.js';
 
 const router = Router();
@@ -176,19 +182,35 @@ async function autoAnchorOnChain(stored: StoredIdentityV2): Promise<void> {
     const blockchain = await getBlockchainService();
     if (!blockchain.isWriteReady()) {
       logger.warn({ identityHash: stored.identity.identityHash }, 'Blockchain not ready for auto-anchor');
+      // Mark as offchain only
+      stored.verified = true;
+      stored.verificationSource = 'offchain';
+      await saveIdentity(stored);
       return;
     }
 
     const result = await blockchain.anchorIdentity(stored.identity.identityHash);
 
     if (result.success && result.transactionHash) {
+      // V1.1: Update verification status
+      stored.verified = true;
+      stored.verificationSource = 'chain';
+
       // Update stored identity with blockchain info
       stored.anchor = {
         txHash: result.transactionHash,
         blockNumber: result.blockNumber || 0,
         chain: 'base',
+        chainId: 8453, // Base mainnet
         anchoredAt: new Date().toISOString(),
       };
+
+      // Recalculate trust score with on-chain bonus
+      stored.trustScore = calculateTrustScore(
+        stored.identity.signature.type,
+        'chain',
+        !!stored.verifications?.twitter
+      );
 
       // Save updated identity
       await saveIdentity(stored);
@@ -196,14 +218,25 @@ async function autoAnchorOnChain(stored: StoredIdentityV2): Promise<void> {
       logger.info({
         identityHash: stored.identity.identityHash.slice(0, 16),
         txHash: result.transactionHash,
+        verified: true,
+        trustScore: stored.trustScore,
       }, 'Identity auto-anchored on-chain');
     } else {
+      // Mark as failed
+      stored.verified = false;
+      stored.verificationSource = 'failed';
+      await saveIdentity(stored);
+
       logger.warn({
         identityHash: stored.identity.identityHash,
         error: result.error,
       }, 'Auto-anchor failed');
     }
   } catch (error) {
+    // Mark as failed on error
+    stored.verified = false;
+    stored.verificationSource = 'failed';
+    await saveIdentity(stored);
     logger.error({ error, identityHash: stored.identity.identityHash }, 'Auto-anchor error');
   }
 }
@@ -530,17 +563,16 @@ router.post(
         tags: data.tags,
       };
 
-      // Calculate trust score
-      let trustScore = 0.1; // Base score for any registration
-      if (signature.type === SignatureType.HUMAN_WALLET) trustScore = 0.5;
-      if (signature.type === SignatureType.TWITTER_PROOF) trustScore = 0.4;
-      if (signature.type === SignatureType.AGENT_KEYPAIR) trustScore = 0.3;
+      // Calculate trust score using V1.1 logic
+      const trustScore = calculateTrustScore(signature.type, 'pending', false);
 
-      // Store
+      // Store with V1.1 verification fields
       const stored: StoredIdentityV2 = {
         id: uuidv4(),
         identity,
         status: ClaimStatus.ACTIVE,
+        verified: false, // Will be true after blockchain confirmation
+        verificationSource: 'pending' as VerificationSource,
         trustScore,
         createdAt: issuedAt,
         updatedAt: issuedAt,
@@ -581,6 +613,8 @@ router.post(
           issuerType,
           trustScore,
           trustDescription: getTrustDescription(identity),
+          verified: false,
+          verificationSource: 'pending',
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           createdAt: issuedAt,
           anchoring: 'in_progress', // Indicates blockchain anchoring is happening
@@ -695,17 +729,19 @@ router.post(
         proofOfWork: data.proofOfWork,
       };
 
-      // Trust score for self-claims
-      let trustScore = 0.2;
+      // Trust score for self-claims using V1.1 logic
+      let trustScore = calculateTrustScore(SignatureType.AGENT_KEYPAIR, 'pending', false);
       if (data.proofOfWork && data.proofOfWork.difficulty >= POW_DIFFICULTY) {
-        trustScore = 0.3; // Higher trust with proof of work
+        trustScore = Math.min(trustScore + 0.1, 0.9); // Bonus for proof of work
       }
 
-      // Store
+      // Store with V1.1 verification fields
       const stored: StoredIdentityV2 = {
         id: uuidv4(),
         identity,
         status: ClaimStatus.ACTIVE,
+        verified: false, // Will be true after blockchain confirmation
+        verificationSource: 'pending' as VerificationSource,
         trustScore,
         createdAt: issuedAt,
         updatedAt: issuedAt,
@@ -745,6 +781,8 @@ router.post(
           publicKey: data.publicKey,
           trustScore,
           trustDescription: getTrustDescription(identity),
+          verified: false,
+          verificationSource: 'pending',
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           createdAt: issuedAt,
           anchoring: 'in_progress',
@@ -888,16 +926,17 @@ router.post(
         issuedAt,
       };
 
-      // Trust score
-      let trustScore = 0.3;
-      if (signature.type === SignatureType.HUMAN_WALLET) trustScore = 0.6;
-      if (systemPromptHash) trustScore += 0.1;
+      // Trust score using V1.1 logic
+      let trustScore = calculateTrustScore(signature.type, 'pending', false);
+      if (systemPromptHash) trustScore = Math.min(trustScore + 0.1, 0.9);
 
-      // Store
+      // Store with V1.1 verification fields
       const stored: StoredIdentityV2 = {
         id: uuidv4(),
         identity,
         status: ClaimStatus.ACTIVE,
+        verified: false, // Will be true after blockchain confirmation
+        verificationSource: 'pending' as VerificationSource,
         trustScore,
         createdAt: issuedAt,
         updatedAt: issuedAt,
@@ -939,6 +978,8 @@ router.post(
           configStored: data.storeConfig,
           trustScore,
           trustDescription: getTrustDescription(identity),
+          verified: false,
+          verificationSource: 'pending',
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           createdAt: issuedAt,
           anchoring: 'in_progress',
@@ -1125,18 +1166,18 @@ router.post(
         } as AttestationIdentity;
       }
 
-      // Calculate trust score
-      let trustScore = 0.1;
-      if (signature.type === SignatureType.HUMAN_WALLET) trustScore = 0.5;
-      else if (signature.type === SignatureType.AGENT_KEYPAIR) trustScore = 0.3;
-      if (data.agent.systemPromptHash) trustScore += 0.1;
-      if (data.agent.skills && data.agent.skills.length > 0) trustScore += 0.05;
+      // Calculate trust score using V1.1 logic
+      let trustScore = calculateTrustScore(signature.type, 'pending', false);
+      if (data.agent.systemPromptHash) trustScore = Math.min(trustScore + 0.1, 0.9);
+      if (data.agent.skills && data.agent.skills.length > 0) trustScore = Math.min(trustScore + 0.05, 0.9);
 
-      // Store identity
+      // Store identity with V1.1 verification fields
       const stored: StoredIdentityV2 = {
         id: uuidv4(),
         identity,
         status: ClaimStatus.ACTIVE,
+        verified: false, // Will be true after blockchain confirmation
+        verificationSource: 'pending' as VerificationSource,
         trustScore: Math.min(trustScore, 1.0),
         createdAt: issuedAt,
         updatedAt: issuedAt,
@@ -1172,7 +1213,7 @@ router.post(
         'OpenClaw agent registered'
       );
 
-      // Return OpenClaw-friendly response
+      // Return OpenClaw-friendly response with V1.1 verification fields
       res.status(201).json({
         success: true,
         data: {
@@ -1182,6 +1223,9 @@ router.post(
           model: { provider, modelId },
           trustScore: stored.trustScore,
           trustDescription: getTrustDescription(identity),
+          // V1.1 verification status
+          verified: false,
+          verificationSource: 'pending',
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           apiUrl: `https://agent007-api-production.up.railway.app/api/v2/agents/${identityHash}`,
           createdAt: issuedAt,
@@ -1321,14 +1365,20 @@ router.get(
 
       const identity = stored.identity;
 
-      // Build response based on identity type
+      // Build response based on identity type - V1.1 format with verification fields
       const response: Record<string, unknown> = {
         identityHash: identity.identityHash,
         identityType: identity.identityType,
         agentName: identity.agentName,
         status: stored.status,
+        // V1.1: Verification status
+        verified: stored.verified ?? false,
+        verificationSource: stored.verificationSource ?? 'offchain',
+        verificationMessage: getVerificationMessage(stored),
+        // Trust
         trustScore: stored.trustScore,
         trustDescription: getTrustDescription(identity),
+        // Timestamps
         createdAt: stored.createdAt,
         version: stored.version,
       };
@@ -1474,6 +1524,10 @@ router.get(
           identityHash,
           identityType: identity.identityType,
           agentName: identity.agentName,
+          // V1.1 verification status
+          verified: stored.verified ?? false,
+          verificationSource: stored.verificationSource ?? 'offchain',
+          verificationMessage: getVerificationMessage(stored),
           trustScore: stored.trustScore,
           proofs,
           disclaimer: 'These proofs verify claims made at registration time. They do not guarantee current state or behavior.',
@@ -1507,7 +1561,7 @@ router.get(
         pageSize
       );
 
-      // Map to response format with all fields the website needs
+      // Map to response format with all fields the website needs - V1.1 format
       res.json({
         success: true,
         data: paged.map((s) => {
@@ -1517,6 +1571,10 @@ router.get(
             identityType: identity.identityType,
             agentName: identity.agentName,
             displayName: identity.agentName,
+            // V1.1 verification status
+            verified: s.verified ?? false,
+            verificationSource: s.verificationSource ?? 'offchain',
+            // Trust
             trustScore: s.trustScore,
             trustDescription: getTrustDescription(identity),
             createdAt: s.createdAt,
@@ -1527,9 +1585,10 @@ router.get(
           if (identity.identityType === IdentityType.ATTESTATION) {
             base.platform = identity.platform;
             base.tags = identity.tags || [];
-          } else if (identity.identityType === IdentityType.FINGERPRINT) {
-            base.model = identity.model;
-            base.platform = identity.model.provider;
+          } else if (identity.identityType === IdentityType.FINGERPRINT || identity.identityType === IdentityType.CONFIG) {
+            const fingerprintIdentity = identity as FingerprintIdentity | ConfigIdentity;
+            base.model = fingerprintIdentity.model;
+            base.platform = fingerprintIdentity.model.provider;
           } else if (identity.identityType === IdentityType.SELF_CLAIM) {
             base.platform = 'autonomous';
           }
@@ -1564,16 +1623,17 @@ router.get(
  */
 router.delete(
   '/admin/purge-test-data',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const adminSecret = req.headers['x-admin-secret'];
 
       // Simple admin auth - in production use proper auth
       if (adminSecret !== process.env.ADMIN_SECRET && adminSecret !== 'agentid-admin-2024') {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: 'Unauthorized - invalid admin secret',
         });
+        return;
       }
 
       const isDbAvailable = await checkConnection();
