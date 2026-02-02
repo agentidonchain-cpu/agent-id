@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentID Verifier</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+          <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
+        </svg>
+        <span>AgentID</span>
+      </div>
+      <div class="version">v1.0.0</div>
+    </header>
+
+    <main>
+      <section class="stats">
+        <div class="stat">
+          <div class="stat-value" id="verified-count">0</div>
+          <div class="stat-label">Verified</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="unknown-count">0</div>
+          <div class="stat-label">Unknown</div>
+        </div>
+      </section>
+
+      <section class="lookup">
+        <h3>Verify Hash</h3>
+        <div class="input-group">
+          <input
+            type="text"
+            id="hash-input"
+            placeholder="0x..."
+            pattern="0x[a-fA-F0-9]{64}"
+          />
+          <button id="verify-btn">Verify</button>
+        </div>
+        <div id="result" class="result hidden"></div>
+      </section>
+
+      <section class="info">
+        <p>This extension automatically detects and verifies AgentID hashes on any webpage.</p>
+        <p>Look for badges next to 64-character hex strings.</p>
+      </section>
+    </main>
+
+    <footer>
+      <a href="https://id-agent.org" target="_blank">id-agent.org</a>
+      <a href="https://github.com/agentid" target="_blank">GitHub</a>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

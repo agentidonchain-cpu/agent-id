@@ -1,0 +1,81 @@
+/* AgentID Badge Styles */
+.agentid-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin-left: 6px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+  text-decoration: none !important;
+}
+
+.agentid-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.agentid-badge svg {
+  flex-shrink: 0;
+}
+
+.agentid-text {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentid-score {
+  opacity: 0.8;
+  font-size: 10px;
+}
+
+/* Verified - Green */
+.agentid-verified {
+  background: linear-gradient(135deg, #059669, #10b981);
+  color: white;
+  border: 1px solid #34d399;
+}
+
+.agentid-verified:hover {
+  background: linear-gradient(135deg, #047857, #059669);
+}
+
+/* Trusted - Blue */
+.agentid-trusted {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: white;
+  border: 1px solid #60a5fa;
+}
+
+.agentid-trusted:hover {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
+
+/* Pending - Yellow/Orange */
+.agentid-pending {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: white;
+  border: 1px solid #fbbf24;
+}
+
+.agentid-pending:hover {
+  background: linear-gradient(135deg, #b45309, #d97706);
+}
+
+/* Unknown - Gray */
+.agentid-unknown {
+  background: linear-gradient(135deg, #4b5563, #6b7280);
+  color: white;
+  border: 1px solid #9ca3af;
+}
+
+.agentid-unknown:hover {
+  background: linear-gradient(135deg, #374151, #4b5563);
+}

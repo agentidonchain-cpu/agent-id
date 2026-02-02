@@ -1,0 +1,16 @@
+{
+  "name": "agentid-extension",
+  "version": "1.0.0",
+  "description": "Browser extension to verify AgentID hashes",
+  "scripts": {
+    "build": "npm run clean && tsc && npm run copy-assets",
+    "clean": "rm -rf dist",
+    "copy-assets": "mkdir -p dist/popup && cp src/popup/*.html src/popup/*.css dist/popup/ && cp -r icons dist/ && cp manifest.json dist/ && cp src/content.css dist/",
+    "dev": "tsc --watch",
+    "package": "npm run build && cd dist && zip -r ../agentid-extension.zip ."
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "typescript": "^5.4.0"
+  }
+}
