@@ -1,6 +1,6 @@
 {
   "name": "agentidbase",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "description": "CLI for registering and verifying AI agent identities on-chain",
   "type": "module",
   "bin": {

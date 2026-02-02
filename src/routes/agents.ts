@@ -15,6 +15,7 @@ import { autonomyDetector } from '../services/autonomy/detector.js';
 import { fingerprintService, type ResponseSample } from '../services/autonomy/fingerprint.js';
 import { getContinuousVerificationService } from '../services/verification/continuous.js';
 import { getAgentStorageService, type StoredRegistration, type StoredIdentity } from '../services/storage/index.js';
+import { getBlockchainService } from '../services/blockchain/base-chain.js';
 import { AttestationType, TrustLevel, VerificationCheckType, AlertSeverity } from '../types/identity.js';
 import { apiKeyAuth, type AuthenticatedRequest } from '../middleware/auth.js';
 import { ValidationError, NotFoundError, ConflictError } from '../middleware/errorHandler.js';
@@ -415,6 +416,32 @@ router.post(
         'ConfigIdentity registered successfully'
       );
 
+      // Auto-anchor on blockchain (free for users - we pay gas)
+      let anchorResult: { success: boolean; transactionHash?: string; explorerUrl?: string; error?: string } = { success: false };
+      try {
+        const blockchain = await getBlockchainService();
+        if (blockchain.isWriteReady()) {
+          // Remove 0x prefix for anchoring
+          const hashWithoutPrefix = identityHash.startsWith('0x') ? identityHash.slice(2) : identityHash;
+          anchorResult = await blockchain.anchorIdentity(hashWithoutPrefix);
+          if (anchorResult.success) {
+            logger.info(
+              { identityHash: identityHash.slice(0, 10) + '...', txHash: anchorResult.transactionHash },
+              'ConfigIdentity auto-anchored on-chain'
+            );
+          } else {
+            logger.warn(
+              { identityHash: identityHash.slice(0, 10) + '...', error: anchorResult.error },
+              'Failed to auto-anchor on-chain (will retry later)'
+            );
+          }
+        } else {
+          logger.warn('Blockchain service not ready for write operations - skipping auto-anchor');
+        }
+      } catch (anchorError) {
+        logger.warn({ error: anchorError }, 'Error during auto-anchoring (registration still successful)');
+      }
+
       // Emit WebSocket event for real-time updates
       try {
         const wsService = getWebSocketService();
@@ -441,6 +468,9 @@ router.post(
           registeredAt: new Date().toISOString(),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           status: 'validated',
+          anchored: anchorResult.success,
+          transactionHash: anchorResult.transactionHash,
+          explorerUrl: anchorResult.explorerUrl,
         },
         meta: {
           requestId: uuidv4(),
@@ -581,6 +611,24 @@ router.post(
         'AttestationIdentity registered successfully'
       );
 
+      // Auto-anchor on blockchain (free for users - we pay gas)
+      let anchorResult: { success: boolean; transactionHash?: string; explorerUrl?: string; error?: string } = { success: false };
+      try {
+        const blockchain = await getBlockchainService();
+        if (blockchain.isWriteReady()) {
+          const hashWithoutPrefix = identityHash.startsWith('0x') ? identityHash.slice(2) : identityHash;
+          anchorResult = await blockchain.anchorIdentity(hashWithoutPrefix);
+          if (anchorResult.success) {
+            logger.info(
+              { identityHash: identityHash.slice(0, 10) + '...', txHash: anchorResult.transactionHash },
+              'AttestationIdentity auto-anchored on-chain'
+            );
+          }
+        }
+      } catch (anchorError) {
+        logger.warn({ error: anchorError }, 'Error during auto-anchoring attestation');
+      }
+
       // Emit WebSocket event for real-time updates
       try {
         const wsService = getWebSocketService();
@@ -610,6 +658,9 @@ router.post(
           registeredAt: new Date().toISOString(),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           status: 'attested',
+          anchored: anchorResult.success,
+          transactionHash: anchorResult.transactionHash,
+          explorerUrl: anchorResult.explorerUrl,
           note: 'This is an attestation, not a verified configuration.',
         },
         meta: {

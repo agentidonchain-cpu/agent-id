@@ -178,31 +178,27 @@ export async function register(options: RegisterOptions): Promise<void> {
     });
     registerSpinner.succeed('Agent registered with AgentID');
 
-    // Anchor on-chain (free - AgentID pays gas)
-    if (options.anchor) {
+    // Show anchor status from registration response
+    if (result.anchored) {
       console.log();
       console.log(chalk.dim('─'.repeat(60)));
       console.log();
-      console.log(chalk.bold.cyan('STEP 5: ANCHORING ON BLOCKCHAIN'));
+      console.log(chalk.bold.cyan('STEP 5: ON-CHAIN ANCHORING'));
       console.log(chalk.dim('Recording identity on Base Mainnet (free - we pay the gas)...'));
-      console.log(chalk.dim('Owner on-chain will be: ') + chalk.white(signatureResult.walletAddress));
       console.log();
-
-      const anchorSpinner = ora('Anchoring on Base Mainnet (Chain ID: 8453)...').start();
-      const anchor = await anchorIdentity(options.api, `0x${identityHash}`, signatureResult.walletAddress);
-
-      if (anchor.success) {
-        anchorSpinner.succeed('Successfully anchored on Base Mainnet!');
-        if (anchor.txHash) {
-          console.log();
-          console.log(chalk.dim('Transaction: ') + chalk.cyan(`https://basescan.org/tx/${anchor.txHash}`));
-        }
-      } else {
-        anchorSpinner.info('Anchoring in progress...');
+      console.log(chalk.green('✓ Successfully anchored on Base Mainnet!'));
+      if (result.transactionHash) {
         console.log();
-        console.log(chalk.dim('Your identity will be anchored on-chain shortly.'));
-        console.log(chalk.dim('This usually takes less than 30 seconds.'));
+        console.log(chalk.dim('Transaction: ') + chalk.cyan(`https://basescan.org/tx/${result.transactionHash}`));
       }
+    } else if (options.anchor) {
+      console.log();
+      console.log(chalk.dim('─'.repeat(60)));
+      console.log();
+      console.log(chalk.yellow('⚠ On-chain anchoring pending'));
+      console.log(chalk.dim('Your identity will be anchored on-chain shortly.'));
+      console.log(chalk.dim('Use the verify command to check status:'));
+      console.log(chalk.cyan(`  npx agentidbase verify 0x${identityHash}`));
     }
 
     // Final output
@@ -302,7 +298,9 @@ async function signWithBrowser(identityHash: string, apiUrl: string): Promise<Si
   try {
     const result = await browserSign(`0x${identityHash}`, 'config', message);
     return {
-      ...result,
+      signature: result.signature,
+      walletAddress: result.walletAddress,
+      timestamp,  // Use original timestamp (embedded in message), not session timestamp
       message,
     };
   } catch (error: any) {
@@ -427,7 +425,7 @@ async function registerWithAPI(
     message: string;
     storeConfig?: boolean;
   }
-): Promise<{ registrationId: string }> {
+): Promise<{ registrationId: string; anchored?: boolean; transactionHash?: string }> {
   // Use the new V1 config registration endpoint
   const response = await fetch(`${apiUrl}/api/v1/agents/register/config`, {
     method: 'POST',
@@ -456,35 +454,8 @@ async function registerWithAPI(
   const data = await response.json();
   return {
     registrationId: data.data?.identityHash || signatureData.identityHash,
+    anchored: data.data?.anchored,
+    transactionHash: data.data?.transactionHash,
   };
 }
 
-async function anchorIdentity(
-  apiUrl: string,
-  identityHash: string,
-  ownerAddress: string
-): Promise<{ success: boolean; txHash?: string }> {
-  try {
-    const response = await fetch(`${apiUrl}/api/v1/blockchain/anchor`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        identityHash,
-        ownerAddress,
-        identityType: 'config',
-      }),
-    });
-
-    if (!response.ok) {
-      return { success: false };
-    }
-
-    const data = await response.json();
-    return {
-      success: true,
-      txHash: data.txHash || data.transactionHash,
-    };
-  } catch {
-    return { success: false };
-  }
-}
