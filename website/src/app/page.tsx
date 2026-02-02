@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 
 const CONTRACT_ADDRESS = "0x471C4c43672be2d49A2ceC79203c23b7194A22Fa";
-const TOKEN_ADDRESS = "0x7E56f85529318a6a6Ea3C3D279a8F17Ec77B0B07";
+const TOKEN_ADDRESS = "0x15F6A278eB7dAaB20d31Eb0c9E5a7200CF93ab07";
 const RPC_URL = "https://mainnet.base.org";
 const CHAIN = "Base Mainnet";
 const CHAIN_ID = "8453";
