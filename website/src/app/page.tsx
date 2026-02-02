@@ -3,32 +3,50 @@
 import { useEffect, useState } from "react";
 
 const CONTRACT_ADDRESS = "0x471C4c43672be2d49A2ceC79203c23b7194A22Fa";
+const RPC_URL = "https://mainnet.base.org";
 const CHAIN = "Base Mainnet";
 const CHAIN_ID = "8453";
 
 export default function Home() {
-  const [stats, setStats] = useState({ totalAgents: 0, totalAnchored: 0 });
+  const [stats, setStats] = useState({ anchored: 0, active: 0 });
   const [copied, setCopied] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Fetch stats from API
+  // Fetch stats directly from blockchain
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchOnChainStats = async () => {
       try {
-        const res = await fetch("https://api.id-agent.org/api/v1/blockchain/stats");
-        const data = await res.json();
-        if (data.data?.display) {
-          setStats({
-            totalAgents: data.data.display.totalAgents || 0,
-            totalAnchored: data.data.onChain?.totalAnchored || 0,
-          });
+        // Call getStats() on the contract - returns (anchored, revoked, active)
+        const data = "0xc59d4847"; // getStats() selector
+
+        const response = await fetch(RPC_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "eth_call",
+            params: [{ to: CONTRACT_ADDRESS, data }, "latest"],
+          }),
+        });
+
+        const result = await response.json();
+
+        if (result.result && result.result !== "0x") {
+          const hex = result.result.slice(2);
+          const anchored = parseInt(hex.slice(0, 64), 16);
+          const active = parseInt(hex.slice(128, 192), 16);
+
+          setStats({ anchored, active });
+          setLastUpdate(new Date());
         }
       } catch {
-        // API not available, use defaults
+        // RPC not available, keep current stats
       }
     };
 
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
+    fetchOnChainStats();
+    const interval = setInterval(fetchOnChainStats, 15000); // Update every 15s
     return () => clearInterval(interval);
   }, []);
 
@@ -43,7 +61,15 @@ export default function Home() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-[#262626] bg-[#0a0a0a]/90 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="text-lg font-semibold tracking-tight">AgentID</span>
+          <div className="flex items-center gap-3">
+            <span className="text-lg font-semibold tracking-tight">AgentID</span>
+            {stats.anchored > 0 && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 text-xs text-[#525252] bg-[#171717] rounded-full border border-[#262626]">
+                <span className="w-1 h-1 bg-[#22c55e] rounded-full animate-pulse" />
+                {stats.anchored} agents
+              </span>
+            )}
+          </div>
           <nav className="flex items-center gap-6 text-sm text-[#737373]">
             <a href="https://docs.id-agent.org" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">Docs</a>
             <a href="https://github.com/agentidonchain-cpu/agent-id" target="_blank" rel="noopener noreferrer" className="hover:text-[#e5e5e5] transition-colors">GitHub</a>
@@ -78,11 +104,18 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Live Stats */}
-          {stats.totalAgents > 0 && (
-            <div className="mt-8 inline-flex items-center gap-2 text-sm text-[#737373]">
-              <span className="w-2 h-2 bg-[#22c55e] rounded-full animate-pulse" />
-              <span>{stats.totalAgents.toLocaleString()} agents registered</span>
+          {/* Live Stats - Discrete counter */}
+          {stats.anchored > 0 && (
+            <div className="mt-8 flex items-center gap-6 text-sm text-[#525252]">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 bg-[#22c55e] rounded-full animate-pulse" />
+                <span>{stats.anchored} verified on-chain</span>
+              </div>
+              {lastUpdate && (
+                <span className="text-xs">
+                  updated {lastUpdate.toLocaleTimeString()}
+                </span>
+              )}
             </div>
           )}
         </section>
