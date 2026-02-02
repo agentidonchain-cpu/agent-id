@@ -31,33 +31,41 @@ export default function DocsPage() {
         <section className="mb-16">
           <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Quick Start</h2>
 
-          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-medium mb-4">Install the CLI</h3>
-            <pre className="bg-[#0a0a0a] rounded-lg p-4 text-sm overflow-x-auto">
-              <code className="text-[#22c55e]">npx agentidbase --help</code>
-            </pre>
+          <div className="bg-gradient-to-r from-[#22c55e]/10 to-transparent border border-[#22c55e]/30 rounded-lg p-6 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">🚀</span>
+              <h3 className="text-lg font-medium">Fastest way to register (60 seconds)</h3>
+            </div>
+            <div className="bg-[#0a0a0a] rounded-lg p-4 mb-3">
+              <pre className="text-sm overflow-x-auto">
+                <code className="text-[#22c55e]">npx agentidbase attest</code>
+              </pre>
+            </div>
+            <p className="text-sm text-[#737373]">
+              Interactive wizard guides you through. No config file needed. Free on-chain anchoring included.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4">
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <div className="text-2xl mb-2">1</div>
-              <h4 className="font-medium mb-2">Choose your method</h4>
+              <div className="text-2xl mb-2 text-[#22c55e]">1</div>
+              <h4 className="font-medium mb-2">Register your agent</h4>
               <p className="text-sm text-[#737373]">
-                Attest (closed platforms), Define (open source), or Self (autonomous)
+                Run <code className="text-[#22c55e]">attest</code> and follow the prompts. Sign with MetaMask.
               </p>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <div className="text-2xl mb-2">2</div>
-              <h4 className="font-medium mb-2">Register</h4>
+              <div className="text-2xl mb-2 text-[#22c55e]">2</div>
+              <h4 className="font-medium mb-2">Link Twitter (optional)</h4>
               <p className="text-sm text-[#737373]">
-                Your agent gets a unique identity hash anchored on Base
+                Run <code className="text-[#22c55e]">verify-twitter</code> to add social proof.
               </p>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <div className="text-2xl mb-2">3</div>
-              <h4 className="font-medium mb-2">Verify</h4>
+              <div className="text-2xl mb-2 text-[#22c55e]">3</div>
+              <h4 className="font-medium mb-2">Share your verification</h4>
               <p className="text-sm text-[#737373]">
-                Anyone can verify your agent on-chain
+                Use <code className="text-[#22c55e]">qr</code> to generate a QR code anyone can scan.
               </p>
             </div>
           </div>
@@ -142,6 +150,49 @@ npx agentidbase define`}</code>
                 <strong>What it proves:</strong> An agent with this keypair exists<br/>
                 <strong>What it does NOT prove:</strong> Who controls the agent
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Twitter Verification */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Twitter Verification</h2>
+
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
+            <p className="text-[#737373] mb-4">
+              Link your Twitter account to your agent identity for additional social proof.
+              This is optional but increases trust.
+            </p>
+
+            <div className="bg-[#0a0a0a] rounded-lg p-4 mb-4">
+              <pre className="text-sm overflow-x-auto">
+                <code className="text-[#22c55e]">{`# After registering your agent
+npx agentidbase verify-twitter @yourhandle`}</code>
+              </pre>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div className="flex items-start gap-3">
+                <span className="text-[#22c55e] font-bold">1.</span>
+                <span className="text-[#737373]">CLI generates a unique verification code</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[#22c55e] font-bold">2.</span>
+                <span className="text-[#737373]">You post a tweet containing the code</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[#22c55e] font-bold">3.</span>
+                <span className="text-[#737373]">Paste the tweet URL back in the CLI</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-[#22c55e] font-bold">4.</span>
+                <span className="text-[#737373]">Your Twitter is now linked to your agent!</span>
+              </div>
+            </div>
+
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded text-sm text-yellow-400">
+              <strong>Note:</strong> This proves you controlled the Twitter account at verification time.
+              The proof tweet may be deleted later.
             </div>
           </div>
         </section>
