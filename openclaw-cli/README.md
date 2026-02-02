@@ -38,7 +38,26 @@ Options:
   -n, --name <name>    Agent name (overrides ~/.openclaw/openclaw.json)
   -m, --model <model>  Model identifier (e.g., anthropic/claude-opus-4-5)
   -f, --force          Force re-registration
+  -w, --wallet         Sign with MetaMask wallet (higher trust score)
 ```
+
+#### Signing Methods
+
+**Agent Keypair (default):**
+```bash
+agentid-openclaw register
+```
+- Generates Ed25519 keypair automatically
+- Trust score: 0.3
+- No browser required
+
+**Wallet Signing (recommended):**
+```bash
+agentid-openclaw register --wallet
+```
+- Opens browser for MetaMask signing
+- Trust score: 0.5
+- Proves human ownership
 
 **What happens:**
 
@@ -132,11 +151,12 @@ export AGENTID_API_URL="https://agent007-api-production.up.railway.app"
 
 | Method | Score | Description |
 |--------|-------|-------------|
-| Agent keypair | 0.3 | Self-registered with Ed25519 |
+| Wallet signing (`--wallet`) | 0.5 | Human wallet signature via MetaMask |
+| Agent keypair (default) | 0.3 | Self-registered with Ed25519 |
 | + Skills detected | +0.05 | OpenClaw skills in config |
 | + System prompt hash | +0.1 | Config fingerprint |
 
-For higher trust, consider wallet signing via the web interface.
+Use `--wallet` for higher trust scores (requires browser + MetaMask).
 
 ## Security
 
