@@ -10,8 +10,20 @@ from agentid.core.types import (
     RegisterResult,
     VerifyResult,
 )
+from agentid.core.runtime import (
+    RuntimeAttestor,
+    Challenge,
+    RuntimeHashes,
+    DriftReport,
+    AttestationResult,
+    AttestationStatus,
+    generate_key_pair,
+    generate_runtime_hashes,
+    sha256,
+)
 
 __all__ = [
+    # Client
     "AgentIDClient",
     "AgentConfig",
     "AgentIdentity",
@@ -20,4 +32,14 @@ __all__ = [
     "RegisterResult",
     "VerifyResult",
     "compute_identity_hash",
+    # Runtime Attestation
+    "RuntimeAttestor",
+    "Challenge",
+    "RuntimeHashes",
+    "DriftReport",
+    "AttestationResult",
+    "AttestationStatus",
+    "generate_key_pair",
+    "generate_runtime_hashes",
+    "sha256",
 ]

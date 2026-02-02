@@ -1,0 +1,51 @@
+{
+  "name": "@agentid/runtime-sdk",
+  "version": "1.0.0",
+  "description": "Runtime Attestation Protocol SDK for AI agents",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "agentid",
+    "ai-agent",
+    "runtime",
+    "attestation",
+    "verification",
+    "identity"
+  ],
+  "author": "AgentID",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agentidonchain-cpu/agent-id.git",
+    "directory": "packages/runtime-sdk"
+  },
+  "homepage": "https://id-agent.org",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}
