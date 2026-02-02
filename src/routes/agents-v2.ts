@@ -165,27 +165,27 @@ async function getAllIdentities(
 
   if (isDbAvailable) {
     try {
-      const countResult = await query<{ count: string }>(
-        'SELECT COUNT(*) as count FROM agent_identities WHERE status != $1',
-        ['revoked']
-      );
-      const total = parseInt(countResult.rows[0]?.count || '0');
-
+      // Get V2 identities - those created by v2-api
       const offset = (page - 1) * pageSize;
       const result = await query<{ bio: string }>(
         `SELECT m.bio FROM agent_metadata m
          JOIN agent_identities i ON i.id = m.agent_id
-         WHERE i.status != $1
+         WHERE i.creator_id = $1 AND i.status != $2
          ORDER BY i.created_at DESC
-         LIMIT $2 OFFSET $3`,
-        ['revoked', pageSize, offset]
+         LIMIT $3 OFFSET $4`,
+        ['v2-api', 'revoked', pageSize, offset]
       );
 
       const items = result.rows
         .filter(row => row.bio)
         .map(row => {
           try {
-            return JSON.parse(row.bio) as StoredIdentityV2;
+            const parsed = JSON.parse(row.bio);
+            // Verify it's a V2 structure
+            if (parsed.identity && parsed.identity.identityType) {
+              return parsed as StoredIdentityV2;
+            }
+            return null;
           } catch {
             return null;
           }
@@ -196,6 +196,13 @@ async function getAllIdentities(
       const filtered = filter?.identityType
         ? items.filter(i => i.identity.identityType === filter.identityType)
         : items;
+
+      // Count only V2 agents
+      const countResult = await query<{ count: string }>(
+        'SELECT COUNT(*) as count FROM agent_identities WHERE creator_id = $1 AND status != $2',
+        ['v2-api', 'revoked']
+      );
+      const total = parseInt(countResult.rows[0]?.count || '0');
 
       return { items: filtered, total };
     } catch (error) {
