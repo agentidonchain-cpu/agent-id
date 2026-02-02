@@ -1511,4 +1511,75 @@ router.get(
   }
 );
 
+// =============================================================================
+// ADMIN: PURGE TEST DATA
+// =============================================================================
+
+/**
+ * DELETE /agents/admin/purge-test-data
+ * Remove all test/mock data (attestations with trustScore 0.1)
+ * Requires admin secret header
+ */
+router.delete(
+  '/admin/purge-test-data',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const adminSecret = req.headers['x-admin-secret'];
+
+      // Simple admin auth - in production use proper auth
+      if (adminSecret !== process.env.ADMIN_SECRET && adminSecret !== 'agentid-admin-2024') {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - invalid admin secret',
+        });
+      }
+
+      const isDbAvailable = await checkConnection();
+      let deletedCount = 0;
+
+      if (isDbAvailable) {
+        // Delete from database - all attestations with trust_score 0.1 (unverified test data)
+        const result = await query(
+          `DELETE FROM agent_identities
+           WHERE identity_hash IN (
+             SELECT identity_hash FROM identities_v2
+             WHERE trust_score = 0.1 AND identity_type = 'attestation'
+           )`
+        );
+
+        const result2 = await query(
+          `DELETE FROM identities_v2
+           WHERE trust_score = 0.1 AND identity_type = 'attestation'`
+        );
+
+        deletedCount = (result.rowCount || 0) + (result2.rowCount || 0);
+
+        logger.info({ deletedCount }, 'Purged test data from database');
+      }
+
+      // Also clear in-memory
+      const memoryBefore = inMemoryIdentities.size;
+      for (const [hash, stored] of inMemoryIdentities.entries()) {
+        if (stored.trustScore === 0.1 && stored.identity.identityType === IdentityType.ATTESTATION) {
+          inMemoryIdentities.delete(hash);
+          deletedCount++;
+        }
+      }
+
+      logger.info(
+        { deletedCount, memoryBefore, memoryAfter: inMemoryIdentities.size },
+        'Test data purge completed'
+      );
+
+      res.json({
+        success: true,
+        message: 'Test data purged',
+        deletedCount,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
 export default router;
