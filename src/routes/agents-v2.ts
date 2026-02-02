@@ -468,6 +468,20 @@ router.post(
       }
 
       const data = parseResult.data;
+
+      // REQUIRE SIGNATURE - No unsigned registrations allowed
+      if (!data.signature || data.signature.type === SignatureType.NONE) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'SIGNATURE_REQUIRED',
+            message: 'Registration requires a valid signature. Use wallet signing or agent keypair.',
+            hint: 'Unsigned registrations are disabled to prevent spam. Visit https://id-agent.org to register with wallet signing.',
+          },
+        });
+        return;
+      }
+
       const issuedAt = new Date().toISOString();
 
       // Determine issuer type based on signature
@@ -806,6 +820,20 @@ router.post(
       }
 
       const data = parseResult.data;
+
+      // REQUIRE SIGNATURE - No unsigned registrations allowed
+      if (!data.signature || data.signature.type === SignatureType.NONE) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'SIGNATURE_REQUIRED',
+            message: 'Registration requires a valid signature. Use wallet signing or agent keypair.',
+            hint: 'Unsigned registrations are disabled to prevent spam. Visit https://id-agent.org to register with wallet signing.',
+          },
+        });
+        return;
+      }
+
       const issuedAt = new Date().toISOString();
 
       // Hash system prompt if provided
@@ -983,6 +1011,20 @@ router.post(
       }
 
       const data = parseResult.data;
+
+      // REQUIRE SIGNATURE - No unsigned registrations allowed
+      if (!data.signature || data.signature.type === SignatureType.NONE) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'SIGNATURE_REQUIRED',
+            message: 'Registration requires a valid signature. Use wallet signing or agent keypair.',
+            hint: 'Use agentid-openclaw register --wallet for wallet signing, or without flag for Ed25519 keypair.',
+          },
+        });
+        return;
+      }
+
       const issuedAt = new Date().toISOString();
 
       // Parse model string (format: "provider/model-id")
