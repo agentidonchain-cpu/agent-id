@@ -217,6 +217,7 @@ export async function self(options: SelfOptions): Promise<void> {
         publicKey: keypair.publicKey,
         declaredCapabilities,
         signature,
+        timestamp, // Include timestamp for signature verification
         endpoint,
         proofOfWork,
       }),

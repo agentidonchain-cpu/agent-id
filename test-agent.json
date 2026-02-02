@@ -1,0 +1,13 @@
+{
+  "name": "TestAgent",
+  "description": "A test agent for signature verification",
+  "model": {
+    "provider": "anthropic",
+    "modelId": "claude-3-5-sonnet-20241022"
+  },
+  "systemPrompt": "You are a helpful test assistant.",
+  "parameters": {
+    "temperature": 0.7,
+    "maxTokens": 4096
+  }
+}

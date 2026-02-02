@@ -321,6 +321,7 @@ const selfRegisterSchema = z.object({
   publicKey: z.string().min(32).max(100), // Base64 Ed25519 public key
   declaredCapabilities: z.array(z.string().max(200)).max(20).default([]),
   signature: z.string().min(1), // Base64 Ed25519 signature
+  timestamp: z.string().optional(), // Client-provided timestamp for signature verification
   endpoint: z.string().url().optional(),
 
   // Proof of work (anti-spam)
@@ -354,7 +355,8 @@ router.post(
       }
 
       const data = parseResult.data;
-      const issuedAt = new Date().toISOString();
+      // Use client-provided timestamp for signature verification, or generate new one
+      const issuedAt = data.timestamp || new Date().toISOString();
 
       // Verify proof of work if provided (reduces spam)
       if (data.proofOfWork) {
@@ -372,7 +374,7 @@ router.post(
         throw new ConflictError('Agent with this public key already registered');
       }
 
-      // Verify Ed25519 signature
+      // Verify Ed25519 signature using client's timestamp
       const message = `AgentID Self-Registration\n\nAgent: ${data.agentName}\nPublic Key: ${data.publicKey}\nTimestamp: ${issuedAt}`;
 
       try {
