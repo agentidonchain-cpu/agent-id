@@ -16,6 +16,8 @@ import { createHash } from 'crypto';
 import nacl from 'tweetnacl';
 import { logger } from '../utils/logger.js';
 import { ValidationError, NotFoundError, ConflictError } from '../middleware/errorHandler.js';
+import { query, checkConnection } from '../config/database.js';
+import { getBlockchainService } from '../services/blockchain/base-chain.js';
 import {
   IdentityType,
   IssuerType,
@@ -32,10 +34,188 @@ import {
 const router = Router();
 
 // =============================================================================
-// IN-MEMORY STORAGE (replace with DB)
+// DATABASE STORAGE
 // =============================================================================
 
-const identities = new Map<string, StoredIdentityV2>();
+// In-memory fallback if database is not available
+const inMemoryIdentities = new Map<string, StoredIdentityV2>();
+
+async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
+  const isDbAvailable = await checkConnection();
+
+  if (isDbAvailable) {
+    try {
+      await query(
+        `INSERT INTO agent_identities (
+          id, identity_hash, creator_id, owner_address, status, created_at, validated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (identity_hash) DO UPDATE SET
+          status = EXCLUDED.status,
+          validated_at = EXCLUDED.validated_at`,
+        [
+          stored.id,
+          stored.identity.identityHash,
+          'v2-api',
+          stored.identity.signature.publicKey || null,
+          stored.status,
+          stored.createdAt,
+          stored.createdAt,
+        ]
+      );
+
+      // Store full V2 data in metadata table as JSONB
+      await query(
+        `INSERT INTO agent_metadata (id, agent_id, display_name, bio, tags)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (agent_id) DO UPDATE SET
+           display_name = EXCLUDED.display_name,
+           bio = EXCLUDED.bio`,
+        [
+          uuidv4(),
+          stored.id,
+          stored.identity.agentName,
+          JSON.stringify(stored),
+          [],
+        ]
+      );
+
+      logger.info({ identityHash: stored.identity.identityHash.slice(0, 16) }, 'V2 identity saved to database');
+    } catch (error) {
+      logger.error({ error }, 'Failed to save V2 identity to database, using in-memory');
+      inMemoryIdentities.set(stored.identity.identityHash, stored);
+    }
+  } else {
+    inMemoryIdentities.set(stored.identity.identityHash, stored);
+  }
+}
+
+async function getIdentity(identityHash: string): Promise<StoredIdentityV2 | null> {
+  const isDbAvailable = await checkConnection();
+
+  if (isDbAvailable) {
+    try {
+      const result = await query<{ bio: string }>(
+        `SELECT m.bio FROM agent_metadata m
+         JOIN agent_identities i ON i.id = m.agent_id
+         WHERE i.identity_hash = $1`,
+        [identityHash]
+      );
+
+      if (result.rows.length > 0 && result.rows[0].bio) {
+        return JSON.parse(result.rows[0].bio) as StoredIdentityV2;
+      }
+    } catch (error) {
+      logger.error({ error }, 'Failed to get V2 identity from database');
+    }
+  }
+
+  return inMemoryIdentities.get(identityHash) || null;
+}
+
+async function identityExists(identityHash: string): Promise<boolean> {
+  const identity = await getIdentity(identityHash);
+  return identity !== null;
+}
+
+// Auto-anchor identity on blockchain (async, non-blocking)
+async function autoAnchorOnChain(stored: StoredIdentityV2): Promise<void> {
+  try {
+    const blockchain = await getBlockchainService();
+    if (!blockchain.isWriteReady()) {
+      logger.warn({ identityHash: stored.identity.identityHash }, 'Blockchain not ready for auto-anchor');
+      return;
+    }
+
+    const result = await blockchain.anchorIdentity(stored.identity.identityHash);
+
+    if (result.success && result.transactionHash) {
+      // Update stored identity with blockchain info
+      stored.anchor = {
+        txHash: result.transactionHash,
+        blockNumber: result.blockNumber || 0,
+        chain: 'base',
+        anchoredAt: new Date().toISOString(),
+      };
+
+      // Save updated identity
+      await saveIdentity(stored);
+
+      logger.info({
+        identityHash: stored.identity.identityHash.slice(0, 16),
+        txHash: result.transactionHash,
+      }, 'Identity auto-anchored on-chain');
+    } else {
+      logger.warn({
+        identityHash: stored.identity.identityHash,
+        error: result.error,
+      }, 'Auto-anchor failed');
+    }
+  } catch (error) {
+    logger.error({ error, identityHash: stored.identity.identityHash }, 'Auto-anchor error');
+  }
+}
+
+async function getAllIdentities(
+  filter?: { identityType?: string },
+  page = 1,
+  pageSize = 20
+): Promise<{ items: StoredIdentityV2[]; total: number }> {
+  const isDbAvailable = await checkConnection();
+
+  if (isDbAvailable) {
+    try {
+      const countResult = await query<{ count: string }>(
+        'SELECT COUNT(*) as count FROM agent_identities WHERE status != $1',
+        ['revoked']
+      );
+      const total = parseInt(countResult.rows[0]?.count || '0');
+
+      const offset = (page - 1) * pageSize;
+      const result = await query<{ bio: string }>(
+        `SELECT m.bio FROM agent_metadata m
+         JOIN agent_identities i ON i.id = m.agent_id
+         WHERE i.status != $1
+         ORDER BY i.created_at DESC
+         LIMIT $2 OFFSET $3`,
+        ['revoked', pageSize, offset]
+      );
+
+      const items = result.rows
+        .filter(row => row.bio)
+        .map(row => {
+          try {
+            return JSON.parse(row.bio) as StoredIdentityV2;
+          } catch {
+            return null;
+          }
+        })
+        .filter((item): item is StoredIdentityV2 => item !== null);
+
+      // Filter by identity type if specified
+      const filtered = filter?.identityType
+        ? items.filter(i => i.identity.identityType === filter.identityType)
+        : items;
+
+      return { items: filtered, total };
+    } catch (error) {
+      logger.error({ error }, 'Failed to list V2 identities from database');
+    }
+  }
+
+  // Fallback to in-memory
+  let items = Array.from(inMemoryIdentities.values());
+  if (filter?.identityType) {
+    items = items.filter(i => i.identity.identityType === filter.identityType);
+  }
+  items = items.filter(i => i.status === ClaimStatus.ACTIVE);
+  items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const total = items.length;
+  const start = (page - 1) * pageSize;
+  const paged = items.slice(start, start + pageSize);
+
+  return { items: paged, total };
+}
 
 // =============================================================================
 // ANTI-SPAM
@@ -281,7 +461,10 @@ router.post(
         version: 1,
       };
 
-      identities.set(identityHash, stored);
+      await saveIdentity(stored);
+
+      // Auto-anchor on blockchain (async, non-blocking)
+      autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
 
       logger.info(
         { identityHash: identityHash.slice(0, 16) + '...', agentName: data.agentName, issuerType },
@@ -300,6 +483,7 @@ router.post(
           trustDescription: getTrustDescription(identity),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           createdAt: issuedAt,
+          anchoring: 'in_progress', // Indicates blockchain anchoring is happening
         },
         meta: {
           requestId: uuidv4(),
@@ -370,7 +554,7 @@ router.post(
       const identityHash = generateSelfClaimHash(data.publicKey);
 
       // Check if already exists
-      if (identities.has(identityHash)) {
+      if (await identityExists(identityHash)) {
         throw new ConflictError('Agent with this public key already registered');
       }
 
@@ -428,7 +612,10 @@ router.post(
         version: 1,
       };
 
-      identities.set(identityHash, stored);
+      await saveIdentity(stored);
+
+      // Auto-anchor on blockchain (async, non-blocking)
+      autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
 
       logger.info(
         { identityHash: identityHash.slice(0, 16) + '...', agentName: data.agentName },
@@ -446,6 +633,7 @@ router.post(
           trustDescription: getTrustDescription(identity),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           createdAt: issuedAt,
+          anchoring: 'in_progress',
         },
         meta: {
           requestId: uuidv4(),
@@ -588,7 +776,10 @@ router.post(
         version: 1,
       };
 
-      identities.set(identityHash, stored);
+      await saveIdentity(stored);
+
+      // Auto-anchor on blockchain (async, non-blocking)
+      autoAnchorOnChain(stored).catch(err => logger.error({ err }, 'Auto-anchor background error'));
 
       logger.info(
         { identityHash: identityHash.slice(0, 16) + '...', agentName: data.agentName },
@@ -608,6 +799,7 @@ router.post(
           trustDescription: getTrustDescription(identity),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
           createdAt: issuedAt,
+          anchoring: 'in_progress',
         },
         meta: {
           requestId: uuidv4(),
@@ -634,7 +826,7 @@ router.get(
         throw new ValidationError('Invalid identity hash format');
       }
 
-      const stored = identities.get(identityHash);
+      const stored = await getIdentity(identityHash);
       if (!stored) {
         throw new NotFoundError('Identity');
       }
@@ -710,7 +902,7 @@ router.get(
         throw new ValidationError('Invalid identity hash format');
       }
 
-      const stored = identities.get(identityHash);
+      const stored = await getIdentity(identityHash);
       if (!stored) {
         throw new NotFoundError('Identity');
       }
@@ -821,26 +1013,11 @@ router.get(
       const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100);
       const identityType = req.query.type as string | undefined;
 
-      let allIdentities = Array.from(identities.values());
-
-      // Filter by type if specified
-      if (identityType) {
-        allIdentities = allIdentities.filter(
-          (s) => s.identity.identityType === identityType
-        );
-      }
-
-      // Filter active only
-      allIdentities = allIdentities.filter((s) => s.status === ClaimStatus.ACTIVE);
-
-      // Sort by creation date (newest first)
-      allIdentities.sort((a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      const { items: paged, total } = await getAllIdentities(
+        identityType ? { identityType } : undefined,
+        page,
+        pageSize
       );
-
-      const total = allIdentities.length;
-      const start = (page - 1) * pageSize;
-      const paged = allIdentities.slice(start, start + pageSize);
 
       res.json({
         success: true,
