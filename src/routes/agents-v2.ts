@@ -46,19 +46,50 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
 
   if (isDbAvailable) {
     try {
-      // First, ensure the v2-api creator exists (using the system creator ID as fallback)
+      // First, ensure a creator exists. Create one if not.
+      const SYSTEM_CREATOR_ID = '00000000-0000-0000-0000-000000000001';
       const creatorResult = await query<{ id: string }>(
-        `SELECT id FROM creators WHERE id = '00000000-0000-0000-0000-000000000001' LIMIT 1`
+        `SELECT id FROM creators WHERE id = $1 LIMIT 1`,
+        [SYSTEM_CREATOR_ID]
       );
 
-      const creatorId = creatorResult.rows.length > 0
-        ? creatorResult.rows[0].id
-        : null;
+      let creatorId = creatorResult.rows.length > 0 ? creatorResult.rows[0].id : null;
 
       if (!creatorId) {
-        logger.warn('No system creator found, using in-memory storage');
-        inMemoryIdentities.set(stored.identity.identityHash, stored);
-        return;
+        // Create the system creator if it doesn't exist
+        // Try minimal insert with just required columns
+        try {
+          await query(
+            `INSERT INTO creators (id, email, api_key_hash)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (id) DO NOTHING`,
+            [
+              SYSTEM_CREATOR_ID,
+              'system@agentid.org',
+              'system-api-key-hash-v2-registration',
+            ]
+          );
+          creatorId = SYSTEM_CREATOR_ID;
+          logger.info('System creator created');
+        } catch (creatorError: any) {
+          // If creator creation fails, try using a random existing creator
+          logger.warn({ error: creatorError.message }, 'Failed to create system creator, trying to find existing');
+          try {
+            const existingResult = await query<{ id: string }>('SELECT id FROM creators LIMIT 1');
+            if (existingResult.rows.length > 0) {
+              creatorId = existingResult.rows[0].id;
+              logger.info({ creatorId }, 'Using existing creator');
+            } else {
+              logger.error('No creators exist, using in-memory storage');
+              inMemoryIdentities.set(stored.identity.identityHash, stored);
+              return;
+            }
+          } catch {
+            logger.error('Failed to find existing creator, using in-memory storage');
+            inMemoryIdentities.set(stored.identity.identityHash, stored);
+            return;
+          }
+        }
       }
 
       // Insert into agent_identities
@@ -72,7 +103,7 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
         [
           stored.id,
           stored.identity.identityHash,
-          creatorId,  // Use valid creator ID
+          creatorId,
           stored.identity.signature.publicKey || null,
           stored.status,
           stored.createdAt,
@@ -81,21 +112,25 @@ async function saveIdentity(stored: StoredIdentityV2): Promise<void> {
       );
 
       // Store full V2 data in metadata table as JSONB
-      // Use the stored.id (which was just inserted into agent_identities.id)
-      await query(
-        `INSERT INTO agent_metadata (id, agent_id, display_name, bio, tags)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (agent_id) DO UPDATE SET
-           display_name = EXCLUDED.display_name,
-           bio = EXCLUDED.bio`,
-        [
-          uuidv4(),
-          stored.id,
-          stored.identity.agentName,
-          JSON.stringify(stored),
-          [],
-        ]
+      // First try to update, then insert if no rows affected
+      const updateResult = await query(
+        `UPDATE agent_metadata SET display_name = $1, bio = $2 WHERE agent_id = $3`,
+        [stored.identity.agentName, JSON.stringify(stored), stored.id]
       );
+
+      if (updateResult.rowCount === 0) {
+        await query(
+          `INSERT INTO agent_metadata (id, agent_id, display_name, bio, tags)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [
+            uuidv4(),
+            stored.id,
+            stored.identity.agentName,
+            JSON.stringify(stored),
+            [],
+          ]
+        );
+      }
 
       logger.info({ identityHash: stored.identity.identityHash.slice(0, 16) }, 'V2 identity saved to database');
     } catch (error: any) {
@@ -892,6 +927,102 @@ router.post(
 );
 
 // =============================================================================
+// ROUTE: GET /agents/stats (for homepage counter)
+// Must come before /:identityHash to avoid being caught by param route
+// =============================================================================
+
+router.get(
+  '/stats',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const isDbAvailable = await checkConnection();
+      let totalAgents = 0;
+      let totalAnchored = 0;
+
+      if (isDbAvailable) {
+        // Count all agents
+        const countResult = await query<{ count: string }>(
+          'SELECT COUNT(*) as count FROM agent_identities WHERE status != $1',
+          ['revoked']
+        );
+        totalAgents = parseInt(countResult.rows[0]?.count || '0');
+
+        // For anchored count, check V2 agents with anchor data in bio
+        try {
+          const v2AnchoredResult = await query<{ count: string }>(
+            `SELECT COUNT(*) as count FROM agent_metadata WHERE bio IS NOT NULL AND bio::text LIKE '%"anchor":%'`,
+            []
+          );
+          totalAnchored = parseInt(v2AnchoredResult.rows[0]?.count || '0');
+        } catch {
+          // If this fails, just use total agents as fallback
+          totalAnchored = totalAgents;
+        }
+      } else {
+        // In-memory fallback
+        totalAgents = inMemoryIdentities.size;
+        totalAnchored = Array.from(inMemoryIdentities.values()).filter(i => i.anchor).length;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          totalAgents,
+          totalAnchored: totalAnchored || totalAgents, // Fallback to totalAgents if no anchored count
+          totalActive: totalAgents,
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =============================================================================
+// ROUTE: GET /agents/recent (for live feed)
+// Must come before /:identityHash to avoid being caught by param route
+// =============================================================================
+
+router.get(
+  '/recent',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+
+      const { items } = await getAllIdentities(undefined, 1, limit);
+
+      res.json({
+        success: true,
+        data: items.map((s) => {
+          const identity = s.identity;
+          return {
+            identityHash: identity.identityHash,
+            displayName: identity.agentName,
+            provider: identity.identityType === IdentityType.FINGERPRINT
+              ? (identity as FingerprintIdentity).model.provider
+              : identity.identityType === IdentityType.ATTESTATION
+                ? (identity as AttestationIdentity).platform
+                : 'autonomous',
+            type: 'registered',
+            timestamp: s.createdAt,
+          };
+        }),
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// =============================================================================
 // ROUTE: GET /agents/:hash
 // =============================================================================
 
@@ -1132,105 +1263,6 @@ router.get(
           pageSize,
           totalItems: total,
           totalPages: Math.ceil(total / pageSize),
-        },
-        meta: {
-          requestId: uuidv4(),
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// =============================================================================
-// ROUTE: GET /agents/recent (for live feed)
-// =============================================================================
-
-router.get(
-  '/recent',
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
-
-      const { items } = await getAllIdentities(undefined, 1, limit);
-
-      res.json({
-        success: true,
-        data: items.map((s) => {
-          const identity = s.identity;
-          return {
-            identityHash: identity.identityHash,
-            displayName: identity.agentName,
-            provider: identity.identityType === IdentityType.FINGERPRINT
-              ? (identity as FingerprintIdentity).model.provider
-              : identity.identityType === IdentityType.ATTESTATION
-                ? (identity as AttestationIdentity).platform
-                : 'autonomous',
-            type: 'registered',
-            timestamp: s.createdAt,
-          };
-        }),
-        meta: {
-          requestId: uuidv4(),
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// =============================================================================
-// ROUTE: GET /agents/stats (for homepage counter)
-// =============================================================================
-
-router.get(
-  '/stats',
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const isDbAvailable = await checkConnection();
-      let totalAgents = 0;
-      let totalAnchored = 0;
-
-      if (isDbAvailable) {
-        // Count all agents (V1 + V2)
-        const countResult = await query<{ count: string }>(
-          'SELECT COUNT(*) as count FROM agent_identities WHERE status != $1',
-          ['revoked']
-        );
-        totalAgents = parseInt(countResult.rows[0]?.count || '0');
-
-        // Count anchored agents
-        const anchoredResult = await query<{ count: string }>(
-          'SELECT COUNT(*) as count FROM agent_identities WHERE blockchain_tx_hash IS NOT NULL',
-          []
-        );
-        totalAnchored = parseInt(anchoredResult.rows[0]?.count || '0');
-
-        // If no anchored count from DB, use in-memory count + check for anchored V2
-        if (totalAnchored === 0) {
-          // Count V2 agents with anchor data in bio
-          const v2AnchoredResult = await query<{ count: string }>(
-            `SELECT COUNT(*) as count FROM agent_metadata WHERE bio::text LIKE '%"anchor":%'`,
-            []
-          );
-          totalAnchored = parseInt(v2AnchoredResult.rows[0]?.count || '0');
-        }
-      } else {
-        // In-memory fallback
-        totalAgents = inMemoryIdentities.size;
-        totalAnchored = Array.from(inMemoryIdentities.values()).filter(i => i.anchor).length;
-      }
-
-      res.json({
-        success: true,
-        data: {
-          totalAgents,
-          totalAnchored: totalAnchored || totalAgents, // Fallback to totalAgents if no anchored count
-          totalActive: totalAgents,
         },
         meta: {
           requestId: uuidv4(),
