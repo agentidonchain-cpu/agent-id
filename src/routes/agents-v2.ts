@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import nacl from 'tweetnacl';
+import QRCode from 'qrcode';
 import { logger } from '../utils/logger.js';
 import { ValidationError, NotFoundError, ConflictError } from '../middleware/errorHandler.js';
 import { query, checkConnection } from '../config/database.js';
@@ -1552,6 +1553,173 @@ router.get(
     }
   }
 );
+
+// =============================================================================
+// ROUTE: GET /agents/:hash/certificate.svg
+// =============================================================================
+
+/**
+ * Generate SVG certificate for an agent
+ * Query params:
+ * - size: 'full' (400x520) | 'badge' (280x60) - default 'full'
+ */
+router.get(
+  '/:identityHash/certificate.svg',
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { identityHash } = req.params;
+      const size = (req.query.size as string) || 'full';
+
+      if (!/^0x[a-fA-F0-9]{64}$/.test(identityHash)) {
+        throw new ValidationError('Invalid identity hash format');
+      }
+
+      const stored = await getIdentity(identityHash);
+      if (!stored) {
+        throw new NotFoundError('Identity');
+      }
+
+      const identity = stored.identity;
+      const verifyUrl = `https://id-agent.org/verify/${identityHash}`;
+
+      // Generate QR code as SVG string
+      const qrSvg = await QRCode.toString(verifyUrl, {
+        type: 'svg',
+        width: size === 'badge' ? 40 : 128,
+        margin: 0,
+        color: {
+          dark: '#22c55e',
+          light: '#00000000', // transparent
+        },
+      });
+
+      // Extract just the SVG paths from QR code (remove wrapper)
+      const qrPaths = qrSvg.replace(/<\?xml[^>]*\?>/, '')
+        .replace(/<svg[^>]*>/, '')
+        .replace(/<\/svg>/, '');
+
+      const trustPercent = Math.round((stored.trustScore || 0) * 100);
+      const truncatedHash = `${identityHash.slice(0, 10)}...${identityHash.slice(-6)}`;
+      const statusColor = stored.verificationSource === 'chain' ? '#22c55e' :
+                          stored.verificationSource === 'pending' ? '#eab308' : '#ef4444';
+      const statusText = stored.verificationSource === 'chain' ? 'VERIFIED ON-CHAIN' :
+                         stored.verificationSource === 'pending' ? 'PENDING' : 'NOT VERIFIED';
+
+      let svg: string;
+
+      if (size === 'badge') {
+        // Compact badge (280x60)
+        svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 60" width="280" height="60">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="100%" style="stop-color:#111111"/>
+    </linearGradient>
+  </defs>
+  <rect width="280" height="60" fill="url(#bgGrad)" rx="8"/>
+  <rect x="1" y="1" width="278" height="58" fill="none" stroke="#262626" stroke-width="1" rx="7"/>
+
+  <!-- Logo -->
+  <rect x="10" y="15" width="30" height="30" fill="#22c55e" rx="4"/>
+  <text x="25" y="37" text-anchor="middle" fill="#0a0a0a" font-family="monospace" font-size="16" font-weight="bold">A</text>
+
+  <!-- Agent Name -->
+  <text x="50" y="25" fill="#e5e5e5" font-family="monospace" font-size="11" font-weight="bold">${escapeXml(identity.agentName.slice(0, 20))}</text>
+
+  <!-- Status -->
+  <text x="50" y="42" fill="${statusColor}" font-family="monospace" font-size="9">${statusText}</text>
+
+  <!-- Trust Score -->
+  <text x="180" y="25" fill="#737373" font-family="monospace" font-size="9">Trust</text>
+  <rect x="180" y="30" width="50" height="8" fill="#262626" rx="2"/>
+  <rect x="180" y="30" width="${trustPercent / 2}" height="8" fill="#22c55e" rx="2"/>
+  <text x="180" y="50" fill="#e5e5e5" font-family="monospace" font-size="10" font-weight="bold">${trustPercent}%</text>
+
+  <!-- QR Code -->
+  <g transform="translate(235, 10)">
+    ${qrPaths}
+  </g>
+</svg>`;
+      } else {
+        // Full certificate (400x520)
+        svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 520" width="400" height="520">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="100%" style="stop-color:#0f0f0f"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#16a34a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="520" fill="url(#bgGrad)" rx="12"/>
+  <rect x="2" y="2" width="396" height="516" fill="none" stroke="#262626" stroke-width="2" rx="10"/>
+
+  <!-- Header accent line -->
+  <rect x="50" y="20" width="300" height="3" fill="url(#accentGrad)" rx="1"/>
+
+  <!-- Logo -->
+  <rect x="175" y="35" width="50" height="50" fill="#22c55e" rx="8"/>
+  <text x="200" y="70" text-anchor="middle" fill="#0a0a0a" font-family="monospace" font-size="28" font-weight="bold">A</text>
+
+  <!-- Title -->
+  <text x="200" y="115" text-anchor="middle" fill="#22c55e" font-family="monospace" font-size="18" font-weight="bold">VERIFIED AGENT</text>
+
+  <!-- Agent Name -->
+  <text x="200" y="155" text-anchor="middle" fill="#e5e5e5" font-family="monospace" font-size="16" font-weight="bold">${escapeXml(identity.agentName.slice(0, 30))}</text>
+
+  <!-- Identity Hash -->
+  <text x="200" y="180" text-anchor="middle" fill="#737373" font-family="monospace" font-size="11">${truncatedHash}</text>
+
+  <!-- QR Code Area -->
+  <rect x="120" y="200" width="160" height="160" fill="#111111" rx="8"/>
+  <g transform="translate(136, 216)">
+    ${qrPaths}
+  </g>
+
+  <!-- Status Badge -->
+  <rect x="100" y="380" width="200" height="36" fill="${statusColor}" fill-opacity="0.15" rx="6"/>
+  <rect x="100" y="380" width="200" height="36" fill="none" stroke="${statusColor}" stroke-width="1" rx="6"/>
+  <text x="200" y="403" text-anchor="middle" fill="${statusColor}" font-family="monospace" font-size="12" font-weight="bold">${statusText}</text>
+
+  <!-- Trust Score -->
+  <text x="100" y="445" fill="#737373" font-family="monospace" font-size="12">Trust Score</text>
+  <rect x="180" y="432" width="120" height="18" fill="#1a1a1a" rx="4"/>
+  <rect x="180" y="432" width="${(trustPercent / 100) * 120}" height="18" fill="#22c55e" rx="4"/>
+  <text x="310" y="445" fill="#e5e5e5" font-family="monospace" font-size="12" font-weight="bold">${trustPercent}%</text>
+
+  <!-- Footer line -->
+  <line x1="50" y1="465" x2="350" y2="465" stroke="#262626" stroke-width="1"/>
+
+  <!-- Scan instruction -->
+  <text x="200" y="490" text-anchor="middle" fill="#737373" font-family="monospace" font-size="10">Scan QR to verify at id-agent.org</text>
+
+  <!-- Branding -->
+  <text x="200" y="508" text-anchor="middle" fill="#22c55e" font-family="monospace" font-size="11" font-weight="bold">AGENTID</text>
+</svg>`;
+      }
+
+      res.set('Content-Type', 'image/svg+xml');
+      res.set('Cache-Control', 'public, max-age=3600');
+      res.send(svg);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Helper function to escape XML special characters
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 // =============================================================================
 // ROUTE: GET /agents (list)
