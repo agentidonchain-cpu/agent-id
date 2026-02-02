@@ -4,7 +4,8 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 
@@ -20,6 +21,9 @@ interface SigningSession {
   timestamp?: string;
   createdAt: Date;
   expiresAt: Date;
+  // CSRF protection
+  csrfToken: string;
+  originIp?: string;
 }
 
 const sessions = new Map<string, SigningSession>();
@@ -64,6 +68,12 @@ router.post('/', async (req: Request, res: Response) => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
 
+    // Generate CSRF token for this session
+    const csrfToken = randomBytes(32).toString('hex');
+
+    // Get client IP for additional validation
+    const originIp = req.ip || req.socket.remoteAddress;
+
     const session: SigningSession = {
       sessionId,
       identityHash,
@@ -72,15 +82,20 @@ router.post('/', async (req: Request, res: Response) => {
       status: 'pending',
       createdAt: now,
       expiresAt,
+      csrfToken,
+      originIp,
     };
 
     sessions.set(sessionId, session);
+
+    logger.debug({ sessionId, identityHash: identityHash.slice(0, 10) + '...' }, 'Signing session created');
 
     return res.status(201).json({
       sessionId: session.sessionId,
       identityHash: session.identityHash,
       identityType: session.identityType,
       status: session.status,
+      csrfToken: session.csrfToken, // Return token to client
       createdAt: session.createdAt.toISOString(),
       expiresAt: session.expiresAt.toISOString(),
     });
@@ -126,6 +141,7 @@ router.get('/:sessionId', async (req: Request, res: Response) => {
       signature: session.signature,
       walletAddress: session.walletAddress,
       timestamp: session.timestamp,
+      csrfToken: session.csrfToken,
       createdAt: session.createdAt.toISOString(),
       expiresAt: session.expiresAt.toISOString(),
     });
@@ -144,11 +160,18 @@ router.get('/:sessionId', async (req: Request, res: Response) => {
 router.post('/:sessionId/signature', async (req: Request, res: Response) => {
   try {
     const { sessionId } = req.params;
-    const { signature, walletAddress, timestamp } = req.body;
+    const { signature, walletAddress, timestamp, csrfToken } = req.body;
 
     if (!signature || !walletAddress) {
       return res.status(400).json({
         error: 'Missing required fields: signature, walletAddress',
+      });
+    }
+
+    if (!csrfToken) {
+      logger.warn({ sessionId }, 'CSRF token missing in signature submission');
+      return res.status(403).json({
+        error: 'CSRF token required',
       });
     }
 
@@ -157,6 +180,18 @@ router.post('/:sessionId/signature', async (req: Request, res: Response) => {
     if (!session) {
       return res.status(404).json({
         error: 'Session not found or expired',
+      });
+    }
+
+    // Validate CSRF token (constant-time comparison to prevent timing attacks)
+    const tokenBuffer = Buffer.from(csrfToken);
+    const sessionTokenBuffer = Buffer.from(session.csrfToken);
+
+    if (tokenBuffer.length !== sessionTokenBuffer.length ||
+        !require('crypto').timingSafeEqual(tokenBuffer, sessionTokenBuffer)) {
+      logger.warn({ sessionId }, 'Invalid CSRF token in signature submission');
+      return res.status(403).json({
+        error: 'Invalid CSRF token',
       });
     }
 

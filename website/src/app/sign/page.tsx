@@ -20,6 +20,7 @@ interface SigningSession {
   message: string;
   status: 'pending' | 'signed' | 'expired' | 'error';
   expiresAt: string;
+  csrfToken?: string;
 }
 
 type PageStatus = 'loading' | 'ready' | 'connecting' | 'signing' | 'submitting' | 'success' | 'error' | 'expired';
@@ -138,7 +139,7 @@ function SignPageContent() {
 
       setStatus('submitting');
 
-      // Submit signature to API
+      // Submit signature to API with CSRF token
       const response = await fetch(`${API_URL}/api/v1/sessions/${sessionId}/signature`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,6 +147,7 @@ function SignPageContent() {
           signature,
           walletAddress,
           timestamp: new Date().toISOString(),
+          csrfToken: session.csrfToken,
         }),
       });
 
