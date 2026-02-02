@@ -17,8 +17,17 @@ interface AgentData {
   identityHash: string;
   creator: string;
   timestamp: number;
-  status: 'verified' | 'pending' | 'not_found';
+  status: 'verified' | 'pending' | 'not_found' | 'api_only';
+  // V2 fields
+  agentName?: string;
+  identityType?: string;
+  platform?: string;
+  publicReference?: string;
+  trustScore?: number;
+  trustDescription?: string;
 }
+
+const API_URL = 'https://agent007-api-production.up.railway.app';
 
 export default function VerifyPage() {
   const params = useParams();
@@ -32,8 +41,59 @@ export default function VerifyPage() {
     async function fetchAgent() {
       if (!hash) return;
 
+      // Try V2 API first (includes both on-chain and API-only agents)
       try {
-        // Call getIdentity(bytes32) on the contract
+        const apiResponse = await fetch(`${API_URL}/api/v2/agents/${hash}`);
+        if (apiResponse.ok) {
+          const apiData = await apiResponse.json();
+          if (apiData.success && apiData.data) {
+            const d = apiData.data;
+            setAgent({
+              identityHash: hash,
+              creator: d.anchor?.txHash ? 'On-chain' : 'API Registered',
+              timestamp: new Date(d.createdAt).getTime() / 1000,
+              status: d.anchor ? 'verified' : 'api_only',
+              agentName: d.agentName,
+              identityType: d.identityType,
+              platform: d.platform,
+              publicReference: d.publicReference,
+              trustScore: d.trustScore,
+              trustDescription: d.trustDescription,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('API fetch failed, trying blockchain:', error);
+      }
+
+      // Fallback: Try V1 API
+      try {
+        const v1Response = await fetch(`${API_URL}/api/v1/agents/${hash}`);
+        if (v1Response.ok) {
+          const v1Data = await v1Response.json();
+          if (v1Data.success && v1Data.data) {
+            const d = v1Data.data;
+            setAgent({
+              identityHash: hash,
+              creator: d.ownerAddress || d.walletAddress || 'Unknown',
+              timestamp: new Date(d.createdAt).getTime() / 1000,
+              status: d.blockchainTxHash ? 'verified' : 'api_only',
+              agentName: d.displayName || d.config?.name,
+              identityType: d.identityType || 'config',
+              trustScore: d.trustScore,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('V1 API fetch failed, trying blockchain:', error);
+      }
+
+      // Final fallback: Check blockchain directly
+      try {
         const data = `0xa7867212${hash.slice(2).padStart(64, '0')}`;
 
         const response = await fetch(RPC_URL, {
@@ -55,7 +115,6 @@ export default function VerifyPage() {
           return;
         }
 
-        // Decode the response (exists, creator, anchoredAt, revokedAt, isValid)
         const hex = result.result.slice(2);
         const exists = parseInt(hex.slice(0, 64), 16) === 1;
 
@@ -135,15 +194,35 @@ export default function VerifyPage() {
       </header>
 
       <div className="container mx-auto px-4 py-12 max-w-5xl">
+        {/* Agent Name */}
+        {agent.agentName && (
+          <h1 className="text-3xl font-bold mb-4 text-green-300">{agent.agentName}</h1>
+        )}
+
         {/* Status Badge */}
-        <div className="mb-8">
+        <div className="mb-8 flex flex-wrap gap-2">
           <div className={`inline-block px-4 py-2 border-2 rounded-lg font-bold ${
             agent.status === 'verified'
               ? 'bg-green-500/20 text-green-300 border-green-500'
+              : agent.status === 'api_only'
+              ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500'
               : 'bg-red-500/20 text-red-300 border-red-500'
           }`}>
-            {agent.status === 'verified' ? 'VERIFIED ON-CHAIN' : 'NOT VERIFIED'}
+            {agent.status === 'verified' ? 'VERIFIED ON-CHAIN' :
+             agent.status === 'api_only' ? 'REGISTERED (not yet on-chain)' : 'NOT VERIFIED'}
           </div>
+
+          {agent.identityType && (
+            <div className="inline-block px-3 py-2 bg-blue-500/20 text-blue-300 border border-blue-500/50 rounded-lg text-sm">
+              {agent.identityType.toUpperCase()}
+            </div>
+          )}
+
+          {agent.trustScore !== undefined && (
+            <div className="inline-block px-3 py-2 bg-purple-500/20 text-purple-300 border border-purple-500/50 rounded-lg text-sm">
+              Trust: {(agent.trustScore * 100).toFixed(0)}%
+            </div>
+          )}
         </div>
 
         {/* Main Grid */}
@@ -209,6 +288,36 @@ export default function VerifyPage() {
                 <dt className="text-xs text-green-300 mb-1">Chain</dt>
                 <dd className="text-sm text-green-400">Base Mainnet (8453)</dd>
               </div>
+
+              {/* Platform (V2) */}
+              {agent.platform && (
+                <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
+                  <dt className="text-xs text-green-300 mb-1">Platform</dt>
+                  <dd className="text-sm text-green-400">{agent.platform}</dd>
+                </div>
+              )}
+
+              {/* Public Reference (V2) */}
+              {agent.publicReference && (
+                <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
+                  <dt className="text-xs text-green-300 mb-1">Reference</dt>
+                  <dd className="text-sm text-green-400 break-all">
+                    {agent.publicReference.startsWith('http') ? (
+                      <a href={agent.publicReference} target="_blank" rel="noopener noreferrer" className="underline hover:text-green-300">
+                        {agent.publicReference}
+                      </a>
+                    ) : agent.publicReference}
+                  </dd>
+                </div>
+              )}
+
+              {/* Trust Description (V2) */}
+              {agent.trustDescription && (
+                <div className="border border-green-500/20 rounded-lg p-3 bg-green-500/5">
+                  <dt className="text-xs text-green-300 mb-1">Trust Level</dt>
+                  <dd className="text-sm text-green-400">{agent.trustDescription}</dd>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
