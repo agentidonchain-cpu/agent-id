@@ -3,6 +3,16 @@
  *
  * Agent ID = birth certificate, NOT ownership, NOT auth.
  *
+ * IMPORTANT DISTINCTIONS:
+ * - "registered" = stored in AgentID database (free, instant)
+ * - "anchored" = stored on Base blockchain (requires gas, permanent)
+ * Both use the same fingerprint. Anchoring is optional and separate.
+ *
+ * SCHEMA OWNERSHIP:
+ * - The OpenClawManifest schema is defined by AgentID, not OpenClaw
+ * - Compatible with OpenClaw v2026.x structure
+ * - If OpenClaw changes layout, fingerprints will change (expected)
+ *
  * This module provides:
  * - Manifest schema (OpenClawManifest)
  * - Canonicalization (deterministic JSON)
