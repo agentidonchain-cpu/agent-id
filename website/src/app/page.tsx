@@ -333,9 +333,18 @@ export default function Home() {
 
               {/* CLI Command */}
               <div className="bg-[#171717] border border-[#262626] rounded-lg p-5 mb-6 group relative">
-                <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase register</code>
+                <div className="space-y-2">
+                  <div>
+                    <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase fingerprint</code>
+                    <span className="text-[#525252] text-xs ml-3">detect identity</span>
+                  </div>
+                  <div>
+                    <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase anchor</code>
+                    <span className="text-[#525252] text-xs ml-3">register on-chain</span>
+                  </div>
+                </div>
                 <button
-                  onClick={() => copyToClipboard("npx agentidbase register", "cli")}
+                  onClick={() => copyToClipboard("npx agentidbase fingerprint && npx agentidbase anchor", "cli")}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#737373] hover:text-[#e5e5e5] transition-colors opacity-0 group-hover:opacity-100"
                 >
                   {copied === "cli" ? "copied" : "copy"}
@@ -343,7 +352,7 @@ export default function Home() {
               </div>
 
               <p className="text-[#737373] text-sm">
-                Register your agent in one command. Free gas. No UI required.
+                Two commands. Zero questions. Free gas.
               </p>
             </div>
 
@@ -457,7 +466,7 @@ export default function Home() {
                 Link your agent to a Twitter account. Prove social presence without OAuth complexity.
               </p>
               <div className="text-xs text-[#525252]">
-                <code className="text-[#22c55e]">npx agentidbase verify-twitter @handle</code>
+                <code className="text-[#22c55e]">npx agentidbase twitter @handle</code>
               </div>
             </div>
 
@@ -534,13 +543,13 @@ export default function Home() {
 
           {/* All CLI Commands */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Initialize config</span><br />
-              <code className="text-[#22c55e]">npx agentidbase init</code>
+            <div className="bg-[#171717] border border-[#22c55e]/30 rounded-lg p-4 text-sm">
+              <span className="text-[#737373]"># Detect fingerprint</span><br />
+              <code className="text-[#22c55e]">npx agentidbase fingerprint</code>
             </div>
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Register agent</span><br />
-              <code className="text-[#22c55e]">npx agentidbase register</code>
+            <div className="bg-[#171717] border border-[#22c55e]/30 rounded-lg p-4 text-sm">
+              <span className="text-[#737373]"># Register on-chain</span><br />
+              <code className="text-[#22c55e]">npx agentidbase anchor</code>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
               <span className="text-[#737373]"># Verify identity</span><br />
@@ -548,15 +557,11 @@ export default function Home() {
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
               <span className="text-[#737373]"># Link Twitter</span><br />
-              <code className="text-[#22c55e]">npx agentidbase verify-twitter @handle</code>
+              <code className="text-[#22c55e]">npx agentidbase twitter @handle</code>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
               <span className="text-[#737373]"># Generate QR code</span><br />
               <code className="text-[#22c55e]">npx agentidbase qr &lt;hash&gt;</code>
-            </div>
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Get proof</span><br />
-              <code className="text-[#22c55e]">npx agentidbase proof &lt;hash&gt;</code>
             </div>
           </div>
         </section>

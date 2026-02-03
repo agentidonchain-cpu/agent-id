@@ -23,7 +23,7 @@ export default function DocsPage() {
         <div className="mb-12">
           <h1 className="text-4xl font-bold mb-4">Documentation</h1>
           <p className="text-xl text-[#737373]">
-            Cryptographic identity verification for AI agents on Base blockchain
+            Cryptographic identity for AI agents. Cartório, não incubadora.
           </p>
         </div>
 
@@ -34,121 +34,116 @@ export default function DocsPage() {
           <div className="bg-gradient-to-r from-[#22c55e]/10 to-transparent border border-[#22c55e]/30 rounded-lg p-6 mb-6">
             <div className="flex items-center gap-2 mb-3">
               <span className="text-2xl">🚀</span>
-              <h3 className="text-lg font-medium">Fastest way to register (60 seconds)</h3>
+              <h3 className="text-lg font-medium">Register in 2 commands</h3>
             </div>
-            <div className="bg-[#0a0a0a] rounded-lg p-4 mb-3">
-              <pre className="text-sm overflow-x-auto">
-                <code className="text-[#22c55e]">npx agentidbase attest</code>
+            <div className="bg-[#0a0a0a] rounded-lg p-4 mb-3 space-y-2">
+              <pre className="text-sm">
+                <code className="text-[#22c55e]">npx agentidbase fingerprint</code>
+                <span className="text-[#525252] ml-4"># detect identity</span>
+              </pre>
+              <pre className="text-sm">
+                <code className="text-[#22c55e]">npx agentidbase anchor</code>
+                <span className="text-[#525252] ml-4"># register on-chain (free)</span>
               </pre>
             </div>
             <p className="text-sm text-[#737373]">
-              Interactive wizard guides you through. No config file needed. Free on-chain anchoring included.
+              No questions. No wizard. Just hash and anchor.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 gap-4">
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <div className="text-2xl mb-2 text-[#22c55e]">1</div>
-              <h4 className="font-medium mb-2">Register your agent</h4>
+              <h4 className="font-medium mb-2">Fingerprint</h4>
               <p className="text-sm text-[#737373]">
-                Run <code className="text-[#22c55e]">attest</code> and follow the prompts. Sign with MetaMask.
+                Auto-detects your agent from the environment. Checks for OpenClaw manifest, agent.json, or git repo.
               </p>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <div className="text-2xl mb-2 text-[#22c55e]">2</div>
-              <h4 className="font-medium mb-2">Link Twitter (optional)</h4>
+              <h4 className="font-medium mb-2">Anchor</h4>
               <p className="text-sm text-[#737373]">
-                Run <code className="text-[#22c55e]">verify-twitter</code> to add social proof.
-              </p>
-            </div>
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <div className="text-2xl mb-2 text-[#22c55e]">3</div>
-              <h4 className="font-medium mb-2">Share your verification</h4>
-              <p className="text-sm text-[#737373]">
-                Use <code className="text-[#22c55e]">qr</code> to generate a QR code anyone can scan.
+                Registers your fingerprint on Base blockchain. Free gas - we pay for it.
               </p>
             </div>
           </div>
         </section>
 
-        {/* Identity Types */}
+        {/* Philosophy */}
         <section className="mb-16">
-          <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Identity Types</h2>
+          <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Philosophy</h2>
 
-          <div className="space-y-6">
-            {/* Attestation */}
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-sm font-medium">
-                  ATTESTATION
-                </span>
-                <span className="text-xs text-[#737373]">Default - lowest friction</span>
-              </div>
-              <h3 className="text-lg font-medium mb-2">For closed platform agents</h3>
-              <p className="text-[#737373] mb-4">
-                Use when you operate an agent on ChatGPT, Character.AI, Poe, or other platforms
-                where you can&apos;t access the configuration.
-              </p>
-              <div className="bg-[#0a0a0a] rounded-lg p-4 mb-4">
-                <pre className="text-sm overflow-x-auto">
-                  <code className="text-[#22c55e]">npx agentidbase attest</code>
-                </pre>
-              </div>
-              <div className="text-sm text-[#737373]">
-                <strong>What it proves:</strong> Someone claims to operate this agent<br/>
-                <strong>What it does NOT prove:</strong> Agent&apos;s actual behavior or configuration
-              </div>
-            </div>
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
+            <h3 className="text-lg font-medium mb-4">Cartório, não incubadora</h3>
+            <p className="text-[#737373] mb-4">
+              AgentID is a notary (cartório), not an incubator. We witness existence, we don&apos;t create agents.
+            </p>
+            <ul className="space-y-2 text-[#737373]">
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">✓</span>
+                <span>Witnesses that an agent configuration exists</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">✓</span>
+                <span>Creates immutable proof on blockchain</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#22c55e]">✓</span>
+                <span>Verifiable by anyone, forever</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#ef4444]">✗</span>
+                <span>Does NOT host or run agents</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#ef4444]">✗</span>
+                <span>Does NOT validate agent behavior</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-[#ef4444]">✗</span>
+                <span>Does NOT ask questions or require wizards</span>
+              </li>
+            </ul>
+          </div>
+        </section>
 
-            {/* Fingerprint */}
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded text-sm font-medium">
-                  FINGERPRINT
-                </span>
-                <span className="text-xs text-[#737373]">Verifiable configuration</span>
-              </div>
-              <h3 className="text-lg font-medium mb-2">For open source / self-hosted agents</h3>
-              <p className="text-[#737373] mb-4">
-                Creates a cryptographic hash of your agent&apos;s configuration that anyone can verify
-                by comparing against the source.
-              </p>
-              <div className="bg-[#0a0a0a] rounded-lg p-4 mb-4">
-                <pre className="text-sm overflow-x-auto">
-                  <code className="text-[#22c55e]">{`# First create agent.json
-npx agentidbase init
+        {/* Auto-Detection */}
+        <section className="mb-16">
+          <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Auto-Detection</h2>
 
-# Then register fingerprint
-npx agentidbase define`}</code>
-                </pre>
-              </div>
-              <div className="text-sm text-[#737373]">
-                <strong>What it proves:</strong> Agent has this specific configuration<br/>
-                <strong>What it does NOT prove:</strong> Agent actually uses this config at runtime
-              </div>
-            </div>
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
+            <p className="text-[#737373] mb-4">
+              The <code className="text-[#22c55e]">fingerprint</code> command auto-detects your agent in this priority order:
+            </p>
 
-            {/* Self-Claim */}
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded text-sm font-medium">
-                  SELF-CLAIM
-                </span>
-                <span className="text-xs text-[#737373]">Autonomous agents</span>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#22c55e] font-bold w-6">1.</span>
+                <div>
+                  <span className="font-medium">openclaw.json</span>
+                  <span className="text-[#525252] text-sm ml-2">OpenClaw manifest</span>
+                </div>
               </div>
-              <h3 className="text-lg font-medium mb-2">For autonomous agents</h3>
-              <p className="text-[#737373] mb-4">
-                Agent registers itself with its own Ed25519 keypair. No human wallet required.
-                Perfect for agent-to-agent trust networks.
-              </p>
-              <div className="bg-[#0a0a0a] rounded-lg p-4 mb-4">
-                <pre className="text-sm overflow-x-auto">
-                  <code className="text-[#22c55e]">npx agentidbase self</code>
-                </pre>
+              <div className="flex items-center gap-4 p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#22c55e] font-bold w-6">2.</span>
+                <div>
+                  <span className="font-medium">agent.json</span>
+                  <span className="text-[#525252] text-sm ml-2">Agent config file</span>
+                </div>
               </div>
-              <div className="text-sm text-[#737373]">
-                <strong>What it proves:</strong> An agent with this keypair exists<br/>
-                <strong>What it does NOT prove:</strong> Who controls the agent
+              <div className="flex items-center gap-4 p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#22c55e] font-bold w-6">3.</span>
+                <div>
+                  <span className="font-medium">.git</span>
+                  <span className="text-[#525252] text-sm ml-2">Git commit hash</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-3 bg-[#0a0a0a] rounded">
+                <span className="text-[#22c55e] font-bold w-6">4.</span>
+                <div>
+                  <span className="font-medium">directory</span>
+                  <span className="text-[#525252] text-sm ml-2">Fallback directory hash</span>
+                </div>
               </div>
             </div>
           </div>
@@ -160,14 +155,12 @@ npx agentidbase define`}</code>
 
           <div className="bg-[#171717] border border-[#262626] rounded-lg p-6">
             <p className="text-[#737373] mb-4">
-              Link your Twitter account to your agent identity for additional social proof.
-              This is optional but increases trust.
+              Optionally link your Twitter account to your agent identity for social proof.
             </p>
 
             <div className="bg-[#0a0a0a] rounded-lg p-4 mb-4">
               <pre className="text-sm overflow-x-auto">
-                <code className="text-[#22c55e]">{`# After registering your agent
-npx agentidbase verify-twitter @yourhandle`}</code>
+                <code className="text-[#22c55e]">npx agentidbase twitter @yourhandle</code>
               </pre>
             </div>
 
@@ -192,78 +185,8 @@ npx agentidbase verify-twitter @yourhandle`}</code>
 
             <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded text-sm text-yellow-400">
               <strong>Note:</strong> This proves you controlled the Twitter account at verification time.
-              The proof tweet may be deleted later.
+              The proof is a point-in-time snapshot.
             </div>
-          </div>
-        </section>
-
-        {/* Trust Score */}
-        <section className="mb-16">
-          <h2 className="text-2xl font-semibold mb-6 text-[#22c55e]">Trust Score</h2>
-
-          <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 mb-6">
-            <p className="text-[#737373] mb-4">
-              Every agent identity has a trust score from 0 to 1.0 that indicates how much verification
-              has been done. Higher scores mean more verifications.
-            </p>
-
-            <h4 className="font-medium mb-3">How Trust Score is Calculated</h4>
-
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
-                <span className="text-[#737373]">Base attestation (no signature)</span>
-                <span className="font-mono text-yellow-400">0.1</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
-                <span className="text-[#737373]">Self-claim (agent keypair)</span>
-                <span className="font-mono text-yellow-400">0.2 - 0.3</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
-                <span className="text-[#737373]">Fingerprint (config hash)</span>
-                <span className="font-mono text-cyan-400">0.3 - 0.7</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
-                <span className="text-[#737373]">Human wallet signature</span>
-                <span className="font-mono text-green-400">0.5 - 0.6</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
-                <span className="text-[#737373]">Twitter verification</span>
-                <span className="font-mono text-blue-400">+0.1 bonus</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-[#0a0a0a] rounded">
-                <span className="text-[#737373]">System prompt hash included</span>
-                <span className="font-mono text-purple-400">+0.1 bonus</span>
-              </div>
-            </div>
-
-            <h4 className="font-medium mb-3">Trust Level Descriptions</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex gap-3">
-                <span className="w-20 text-red-400 font-medium">0.0 - 0.2</span>
-                <span className="text-[#737373]">Unverified - minimal trust, no proof of control</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="w-20 text-yellow-400 font-medium">0.2 - 0.4</span>
-                <span className="text-[#737373]">Basic - some verification, use with caution</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="w-20 text-cyan-400 font-medium">0.4 - 0.6</span>
-                <span className="text-[#737373]">Moderate - wallet or Twitter verified</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="w-20 text-green-400 font-medium">0.6 - 0.8</span>
-                <span className="text-[#737373]">Good - multiple verifications, config auditable</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="w-20 text-[#22c55e] font-medium">0.8 - 1.0</span>
-                <span className="text-[#737373]">High - fully verified with multiple proofs</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-sm">
-            <strong className="text-blue-400">Tip:</strong>
-            <span className="text-[#737373]"> To maximize your trust score, use a wallet signature, link Twitter, and include your agent&apos;s system prompt hash.</span>
           </div>
         </section>
 
@@ -280,28 +203,20 @@ npx agentidbase verify-twitter @yourhandle`}</code>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#262626]">
-                <tr>
-                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase init</td>
-                  <td className="p-4 text-[#737373]">Create agent.json configuration file</td>
+                <tr className="bg-[#22c55e]/5">
+                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase fingerprint</td>
+                  <td className="p-4 text-[#737373]">Auto-detect and generate agent fingerprint</td>
                 </tr>
-                <tr>
-                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase attest</td>
-                  <td className="p-4 text-[#737373]">Declare ownership of a closed platform agent</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase define</td>
-                  <td className="p-4 text-[#737373]">Create fingerprint from agent configuration</td>
-                </tr>
-                <tr>
-                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase self</td>
-                  <td className="p-4 text-[#737373]">Agent self-registers with Ed25519 keypair</td>
+                <tr className="bg-[#22c55e]/5">
+                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase anchor</td>
+                  <td className="p-4 text-[#737373]">Register fingerprint on-chain (free)</td>
                 </tr>
                 <tr>
                   <td className="p-4 font-mono text-[#22c55e]">npx agentidbase verify &lt;hash&gt;</td>
                   <td className="p-4 text-[#737373]">Verify an agent identity on-chain</td>
                 </tr>
                 <tr>
-                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase verify-twitter</td>
+                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase twitter @handle</td>
                   <td className="p-4 text-[#737373]">Link Twitter account to your agent</td>
                 </tr>
                 <tr>
@@ -310,6 +225,11 @@ npx agentidbase verify-twitter @yourhandle`}</code>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4 p-3 bg-[#171717] border border-[#262626] rounded text-sm text-[#737373]">
+            <strong>Note:</strong> The <code className="text-[#22c55e]">anchor</code> command does not require a hash argument.
+            It automatically recalculates the fingerprint from your environment.
           </div>
         </section>
 
@@ -320,57 +240,41 @@ npx agentidbase verify-twitter @yourhandle`}</code>
           <div className="bg-[#171717] border border-[#262626] rounded-lg p-6 mb-6">
             <h3 className="text-lg font-medium mb-2">Base URL</h3>
             <pre className="bg-[#0a0a0a] rounded-lg p-4 text-sm">
-              <code className="text-[#737373]">https://agent007-api-production.up.railway.app/api/v2</code>
+              <code className="text-[#737373]">https://agent007-api-production.up.railway.app/api/v1</code>
             </pre>
           </div>
 
           <div className="space-y-4">
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
+            <div className="bg-[#171717] border border-[#22c55e]/30 rounded-lg p-5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-medium">POST</span>
-                <code className="text-sm">/agents/attest</code>
+                <code className="text-sm">/blockchain/anchor</code>
               </div>
-              <p className="text-sm text-[#737373]">Create attestation for closed platform agent</p>
-            </div>
-
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-medium">POST</span>
-                <code className="text-sm">/agents/fingerprint</code>
-              </div>
-              <p className="text-sm text-[#737373]">Create fingerprint from agent config</p>
-            </div>
-
-            <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-medium">POST</span>
-                <code className="text-sm">/agents/self-register</code>
-              </div>
-              <p className="text-sm text-[#737373]">Agent self-registers with Ed25519</p>
+              <p className="text-sm text-[#737373]">Anchor identity hash on-chain (free)</p>
             </div>
 
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <div className="flex items-center gap-2 mb-2">
                 <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">GET</span>
-                <code className="text-sm">/agents/:hash</code>
+                <code className="text-sm">/blockchain/verify/:hash</code>
               </div>
-              <p className="text-sm text-[#737373]">Get agent identity details</p>
+              <p className="text-sm text-[#737373]">Verify identity on blockchain</p>
             </div>
 
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">GET</span>
-                <code className="text-sm">/agents/:hash/proofs</code>
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-medium">POST</span>
+                <code className="text-sm">/verify/twitter/init</code>
               </div>
-              <p className="text-sm text-[#737373]">Get all proofs for an identity</p>
+              <p className="text-sm text-[#737373]">Start Twitter verification flow</p>
             </div>
 
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs font-medium">GET</span>
-                <code className="text-sm">/agents</code>
+                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 rounded text-xs font-medium">POST</span>
+                <code className="text-sm">/verify/twitter/confirm</code>
               </div>
-              <p className="text-sm text-[#737373]">List all registered agents</p>
+              <p className="text-sm text-[#737373]">Complete Twitter verification</p>
             </div>
           </div>
         </section>
@@ -399,13 +303,12 @@ npx agentidbase verify-twitter @yourhandle`}</code>
             </div>
 
             <div className="mt-6 pt-6 border-t border-[#262626]">
-              <h4 className="font-medium mb-3">What gets stored on-chain</h4>
-              <ul className="text-sm text-[#737373] space-y-2">
-                <li>• Identity hash (SHA-256 of configuration)</li>
-                <li>• Creator address</li>
-                <li>• Timestamp of anchoring</li>
-                <li>• Revocation status</li>
-              </ul>
+              <h4 className="font-medium mb-3">Verify without trusting AgentID</h4>
+              <div className="bg-[#0a0a0a] rounded-lg p-4 text-sm overflow-x-auto">
+                <code className="text-[#22c55e] whitespace-pre">{`cast call 0x471C4c43672be2d49A2ceC79203c23b7194A22Fa \\
+  "verifyIdentity(bytes32)" 0xYOUR_HASH \\
+  --rpc-url https://mainnet.base.org`}</code>
+              </div>
             </div>
           </div>
         </section>
@@ -418,31 +321,31 @@ npx agentidbase verify-twitter @yourhandle`}</code>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <h4 className="font-medium mb-2">Is it free?</h4>
               <p className="text-sm text-[#737373]">
-                Yes! Registration and on-chain anchoring are completely free. We pay all blockchain gas fees.
+                Yes! On-chain anchoring is completely free. We pay all blockchain gas fees.
               </p>
             </div>
 
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
               <h4 className="font-medium mb-2">Do I need a wallet?</h4>
               <p className="text-sm text-[#737373]">
-                For attestation and fingerprint, a wallet signature increases trust score but is optional.
-                For self-claim, no wallet is needed - the agent uses its own Ed25519 keypair.
+                No. The CLI handles everything. If you want to anchor with your own wallet,
+                use <code className="text-[#22c55e]">--local</code> flag.
               </p>
             </div>
 
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <h4 className="font-medium mb-2">What does &quot;verified&quot; mean?</h4>
+              <h4 className="font-medium mb-2">What does &quot;registered&quot; mean?</h4>
               <p className="text-sm text-[#737373]">
-                &quot;Verified on-chain&quot; means the identity hash is permanently recorded on Base blockchain.
-                It proves the identity existed at that moment, not that the agent behaves correctly.
+                &quot;Registered&quot; means the identity hash is permanently recorded on Base blockchain
+                with a mined transaction. This is the ONLY definition of registered.
               </p>
             </div>
 
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-5">
-              <h4 className="font-medium mb-2">Can I update my agent?</h4>
+              <h4 className="font-medium mb-2">Why no questions?</h4>
               <p className="text-sm text-[#737373]">
-                Yes. Changes to your agent&apos;s configuration will produce a new identity hash.
-                You can register the new version while keeping the old one for reference.
+                AgentID follows the CARTÓRIO model - we witness existence, not create agents.
+                Your environment determines the fingerprint. No wizard needed.
               </p>
             </div>
           </div>
@@ -450,12 +353,13 @@ npx agentidbase verify-twitter @yourhandle`}</code>
 
         {/* CTA */}
         <section className="text-center py-12 border-t border-[#262626]">
-          <h2 className="text-2xl font-semibold mb-4">Ready to verify your agent?</h2>
+          <h2 className="text-2xl font-semibold mb-4">Ready to register your agent?</h2>
           <p className="text-[#737373] mb-6">
-            Get started in under 60 seconds with our CLI
+            Two commands. Zero questions.
           </p>
-          <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 inline-block">
-            <code className="text-[#22c55e]">npx agentidbase attest</code>
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 inline-block space-y-2">
+            <div><code className="text-[#22c55e]">npx agentidbase fingerprint</code></div>
+            <div><code className="text-[#22c55e]">npx agentidbase anchor</code></div>
           </div>
         </section>
       </main>
