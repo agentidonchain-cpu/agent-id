@@ -39,15 +39,15 @@ export default function DocsPage() {
             <div className="bg-[#0a0a0a] rounded-lg p-4 mb-3 space-y-2">
               <pre className="text-sm">
                 <code className="text-[#22c55e]">npx agentidbase fingerprint</code>
-                <span className="text-[#525252] ml-4"># detect identity</span>
+                <span className="text-[#525252] ml-4"># {'->'} 0xabc123...</span>
               </pre>
               <pre className="text-sm">
-                <code className="text-[#22c55e]">npx agentidbase anchor</code>
-                <span className="text-[#525252] ml-4"># register on-chain (free)</span>
+                <code className="text-[#22c55e]">npx agentidbase anchor 0xabc123...</code>
+                <span className="text-[#525252] ml-4"># {'->'} tx hash</span>
               </pre>
             </div>
             <p className="text-sm text-[#737373]">
-              No questions. No wizard. Just hash and anchor.
+              Get the hash. Anchor the hash. Done.
             </p>
           </div>
 
@@ -205,11 +205,11 @@ export default function DocsPage() {
               <tbody className="divide-y divide-[#262626]">
                 <tr className="bg-[#22c55e]/5">
                   <td className="p-4 font-mono text-[#22c55e]">npx agentidbase fingerprint</td>
-                  <td className="p-4 text-[#737373]">Auto-detect and generate agent fingerprint</td>
+                  <td className="p-4 text-[#737373]">Generate agent fingerprint hash</td>
                 </tr>
                 <tr className="bg-[#22c55e]/5">
-                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase anchor</td>
-                  <td className="p-4 text-[#737373]">Register fingerprint on-chain (free)</td>
+                  <td className="p-4 font-mono text-[#22c55e]">npx agentidbase anchor &lt;hash&gt;</td>
+                  <td className="p-4 text-[#737373]">Register hash on-chain (free)</td>
                 </tr>
                 <tr>
                   <td className="p-4 font-mono text-[#22c55e]">npx agentidbase verify &lt;hash&gt;</td>
@@ -228,8 +228,8 @@ export default function DocsPage() {
           </div>
 
           <div className="mt-4 p-3 bg-[#171717] border border-[#262626] rounded text-sm text-[#737373]">
-            <strong>Note:</strong> The <code className="text-[#22c55e]">anchor</code> command does not require a hash argument.
-            It automatically recalculates the fingerprint from your environment.
+            <strong>Philosophy:</strong> The cartório only registers what you explicitly present.
+            Get your hash with <code className="text-[#22c55e]">fingerprint</code>, then anchor it.
           </div>
         </section>
 
@@ -355,11 +355,11 @@ export default function DocsPage() {
         <section className="text-center py-12 border-t border-[#262626]">
           <h2 className="text-2xl font-semibold mb-4">Ready to register your agent?</h2>
           <p className="text-[#737373] mb-6">
-            Two commands. Zero questions.
+            Get the hash. Anchor the hash.
           </p>
-          <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 inline-block space-y-2">
-            <div><code className="text-[#22c55e]">npx agentidbase fingerprint</code></div>
-            <div><code className="text-[#22c55e]">npx agentidbase anchor</code></div>
+          <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 inline-block space-y-2 text-left">
+            <div><code className="text-[#22c55e]">npx agentidbase fingerprint</code><span className="text-[#525252] ml-3">{'->'} 0x...</span></div>
+            <div><code className="text-[#22c55e]">npx agentidbase anchor 0x...</code><span className="text-[#525252] ml-3">{'->'} tx</span></div>
           </div>
         </section>
       </main>

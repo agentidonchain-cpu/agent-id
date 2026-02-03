@@ -336,15 +336,15 @@ export default function Home() {
                 <div className="space-y-2">
                   <div>
                     <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase fingerprint</code>
-                    <span className="text-[#525252] text-xs ml-3">detect identity</span>
+                    <span className="text-[#525252] text-xs ml-3">{'->'} 0xabc123...</span>
                   </div>
                   <div>
-                    <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase anchor</code>
-                    <span className="text-[#525252] text-xs ml-3">register on-chain</span>
+                    <code className="text-[#22c55e] text-sm md:text-base">npx agentidbase anchor 0xabc123...</code>
+                    <span className="text-[#525252] text-xs ml-3">{'->'} tx hash</span>
                   </div>
                 </div>
                 <button
-                  onClick={() => copyToClipboard("npx agentidbase fingerprint && npx agentidbase anchor", "cli")}
+                  onClick={() => copyToClipboard("npx agentidbase fingerprint", "cli")}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-[#737373] hover:text-[#e5e5e5] transition-colors opacity-0 group-hover:opacity-100"
                 >
                   {copied === "cli" ? "copied" : "copy"}
@@ -352,7 +352,7 @@ export default function Home() {
               </div>
 
               <p className="text-[#737373] text-sm">
-                Two commands. Zero questions. Free gas.
+                Get the hash. Anchor the hash. Done.
               </p>
             </div>
 
@@ -544,15 +544,15 @@ export default function Home() {
           {/* All CLI Commands */}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             <div className="bg-[#171717] border border-[#22c55e]/30 rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Detect fingerprint</span><br />
+              <span className="text-[#737373]"># Get hash</span><br />
               <code className="text-[#22c55e]">npx agentidbase fingerprint</code>
             </div>
             <div className="bg-[#171717] border border-[#22c55e]/30 rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Register on-chain</span><br />
-              <code className="text-[#22c55e]">npx agentidbase anchor</code>
+              <span className="text-[#737373]"># Register hash</span><br />
+              <code className="text-[#22c55e]">npx agentidbase anchor &lt;hash&gt;</code>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Verify identity</span><br />
+              <span className="text-[#737373]"># Verify hash</span><br />
               <code className="text-[#22c55e]">npx agentidbase verify &lt;hash&gt;</code>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
@@ -560,7 +560,7 @@ export default function Home() {
               <code className="text-[#22c55e]">npx agentidbase twitter @handle</code>
             </div>
             <div className="bg-[#171717] border border-[#262626] rounded-lg p-4 text-sm">
-              <span className="text-[#737373]"># Generate QR code</span><br />
+              <span className="text-[#737373]"># Generate QR</span><br />
               <code className="text-[#22c55e]">npx agentidbase qr &lt;hash&gt;</code>
             </div>
           </div>

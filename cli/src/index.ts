@@ -35,10 +35,10 @@ program
   .option('--json', 'Output as JSON')
   .action(fingerprint);
 
-// anchor - register on-chain
+// anchor - register on-chain (hash REQUIRED)
 program
-  .command('anchor')
-  .description('Register fingerprint on-chain (recalculates automatically)')
+  .command('anchor <hash>')
+  .description('Register a hash on-chain')
   .option('--local', 'Use local wallet instead of free API')
   .option('--private-key <key>', 'Wallet private key (or AGENTID_PRIVATE_KEY env)')
   .option('--rpc <url>', 'Base RPC endpoint', 'https://mainnet.base.org')
@@ -78,9 +78,9 @@ program
   .action(() => {
     console.log(chalk.yellow('`register` is deprecated.'));
     console.log();
-    console.log(chalk.white('Use the new flow:'));
+    console.log(chalk.white('Use:'));
     console.log(chalk.cyan('  agentid fingerprint'));
-    console.log(chalk.cyan('  agentid anchor'));
+    console.log(chalk.cyan('  agentid anchor <hash>'));
     console.log();
   });
 
