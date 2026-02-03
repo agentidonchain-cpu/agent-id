@@ -1119,9 +1119,10 @@ router.get(
       const page = parseInt(req.query.page as string) || 1;
       const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100);
 
-      // Get all validated identities
+      // Get all ON-CHAIN registered identities
+      // ON-CHAIN FIRST: Only show agents with status = 'registered' (on-chain confirmed)
       const { identities: pageIdentities, total: totalItems } = await getStorage().listIdentities({
-        status: IdentityStatus.VALIDATED,
+        status: IdentityStatus.REGISTERED,
         page,
         pageSize,
       });

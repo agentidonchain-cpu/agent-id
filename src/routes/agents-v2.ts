@@ -265,15 +265,16 @@ async function getAllIdentities(
       const offset = (page - 1) * pageSize;
 
       // Query all identities that have metadata with bio containing V2 structure
+      // ON-CHAIN FIRST: Only show agents with status = 'registered' (on-chain confirmed)
       const result = await query<{ bio: string | null; identity_hash: string; created_at: string }>(
         `SELECT m.bio, i.identity_hash, i.created_at FROM agent_identities i
          JOIN agent_metadata m ON i.id = m.agent_id
-         WHERE i.status != $1
+         WHERE i.status = $1
            AND m.bio IS NOT NULL
            AND m.bio::text LIKE '%"identityType"%'
          ORDER BY i.created_at DESC
          LIMIT $2 OFFSET $3`,
-        ['revoked', pageSize, offset]
+        ['registered', pageSize, offset]
       );
 
       logger.debug({ rowCount: result.rows.length }, 'V2 identities query result');
@@ -300,13 +301,14 @@ async function getAllIdentities(
         : items;
 
       // Count V2 agents (those with bio containing identityType)
+      // ON-CHAIN FIRST: Only count agents with status = 'registered' (on-chain confirmed)
       const countResult = await query<{ count: string }>(
         `SELECT COUNT(*) as count FROM agent_identities i
          JOIN agent_metadata m ON i.id = m.agent_id
-         WHERE i.status != $1
+         WHERE i.status = $1
            AND m.bio IS NOT NULL
            AND m.bio::text LIKE '%"identityType"%'`,
-        ['revoked']
+        ['registered']
       );
       const total = parseInt(countResult.rows[0]?.count || '0');
 
@@ -1273,24 +1275,14 @@ router.get(
       let totalAnchored = 0;
 
       if (isDbAvailable) {
-        // Count all agents
+        // ON-CHAIN FIRST: Only count agents with status = 'registered' (on-chain confirmed)
         const countResult = await query<{ count: string }>(
-          'SELECT COUNT(*) as count FROM agent_identities WHERE status != $1',
-          ['revoked']
+          'SELECT COUNT(*) as count FROM agent_identities WHERE status = $1',
+          ['registered']
         );
         totalAgents = parseInt(countResult.rows[0]?.count || '0');
-
-        // For anchored count, check V2 agents with anchor data in bio
-        try {
-          const v2AnchoredResult = await query<{ count: string }>(
-            `SELECT COUNT(*) as count FROM agent_metadata WHERE bio IS NOT NULL AND bio::text LIKE '%"anchor":%'`,
-            []
-          );
-          totalAnchored = parseInt(v2AnchoredResult.rows[0]?.count || '0');
-        } catch {
-          // If this fails, just use total agents as fallback
-          totalAnchored = totalAgents;
-        }
+        // In ON-CHAIN FIRST, registered = anchored (they're the same thing)
+        totalAnchored = totalAgents;
       } else {
         // In-memory fallback
         totalAgents = inMemoryIdentities.size;
