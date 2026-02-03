@@ -11,6 +11,26 @@ Current platforms allow:
 - No way to verify an agent is truly autonomous (many are "puppets" of humans)
 - No cryptographic proof that an agent's "personality" remains consistent
 
+## ON-CHAIN FIRST Principle
+
+> **"If there is no transaction on-chain, the agent does not exist."**
+
+AgentID enforces a strict ON-CHAIN FIRST rule:
+
+| Status | Meaning | Blockchain Proof |
+|--------|---------|------------------|
+| `draft` | Prepared but NOT registered | None |
+| `tx_submitted` | Transaction broadcast, waiting confirmation | Pending |
+| `registered` | **ON-CHAIN** - TX mined with blockNumber | ✅ Required |
+
+**What this means:**
+- The API **fails** (502/503) if blockchain is unavailable or anchoring fails
+- The CLI **exits with code 1** if no transaction is confirmed
+- The database **rejects** `status='registered'` without `blockchain_block_number`
+- The website shows only **REGISTERED** (green, on-chain) or **NOT FOUND** (red)
+
+**There is no "registered (not yet on-chain)" state.** That would be a lie.
+
 ## The Solution
 
 Agent007 provides:
@@ -90,7 +110,7 @@ docker-compose down
 | `/api/v1/agents/:hash/verification/alerts` | GET | Get alerts |
 | `/api/v1/agents/:hash/verification/baseline` | PUT | Update baseline |
 
-## Registration Flow
+## Registration Flow (ON-CHAIN FIRST)
 
 ```
 1. Creator submits agent config (prompt, model, parameters)
@@ -99,17 +119,20 @@ docker-compose down
 2. System computes identity hash (Merkle root)
          │
          ▼
-3. Validation challenge generated
+3. BLOCKCHAIN ANCHOR (ON-CHAIN FIRST)
+   ├── Submit TX to Base Mainnet
+   ├── Wait for TX to be mined
+   └── Get blockNumber as proof
          │
          ▼
-4. Agent responds to challenges
+4. IF TX MINED → Save to database with status='registered'
+   IF TX FAILS → Return error (502), agent NOT registered
          │
          ▼
-5. System validates responses match declared config
-         │
-         ▼
-6. Identity SEALED - no modifications allowed
+5. Identity SEALED - immutable, verifiable on-chain
 ```
+
+**Critical:** Step 3 (blockchain anchor) must succeed BEFORE the identity is saved. If the blockchain is unavailable or the TX fails, the registration fails entirely.
 
 ## Example: Register an Agent
 
@@ -254,6 +277,24 @@ curl -X POST http://localhost:3000/api/v1/agents/{hash}/verification/schedule \
   }'
 ```
 
+## Blockchain (Base Mainnet)
+
+AgentID anchors all registrations to **Base Mainnet** (Chain ID: 8453).
+
+| Item | Value |
+|------|-------|
+| Network | Base Mainnet |
+| Chain ID | 8453 |
+| Contract | `0x471C4c43672be2d49A2ceC79203c23b7194A22Fa` |
+| Explorer | [BaseScan](https://basescan.org/address/0x471C4c43672be2d49A2ceC79203c23b7194A22Fa) |
+
+Every registered agent has:
+- `transactionHash` - The TX that anchored the identity
+- `blockNumber` - The block where the TX was mined
+- `explorerUrl` - Direct link to verify on BaseScan
+
+**Verify any agent:** Check the identity hash on-chain. If it's not there, the agent is not registered.
+
 ## Environment Variables
 
 ```bash
@@ -262,6 +303,10 @@ DATABASE_URL=postgresql://user:pass@host:5432/db
 REDIS_URL=redis://host:6379
 JWT_SECRET=your-secret-min-32-chars
 ENCRYPTION_MASTER_KEY=64-hex-chars
+
+# Blockchain (Required for ON-CHAIN FIRST)
+BASE_RPC_URL=https://mainnet.base.org
+BASE_PRIVATE_KEY=your-private-key-for-anchoring
 
 # Optional
 PORT=3000
@@ -286,6 +331,15 @@ CORS_ORIGIN=*
 - [x] Autonomy detection (v1)
 - [x] Webhook notifications
 - [x] Alert management
+
+### Phase 2.5: ON-CHAIN FIRST ✅
+- [x] Base Mainnet integration (Chain ID 8453)
+- [x] ON-CHAIN FIRST enforcement: "registered" = TX mined
+- [x] Database constraints: no `registered` without `block_number`
+- [x] API fails with 502/503 if blockchain unavailable
+- [x] CLI exits with code 1 if TX not confirmed
+- [x] Website: only green (on-chain) or red (not found)
+- [x] OpenClaw as manifest/fingerprint source only
 
 ### Phase 3: Advanced (Next)
 - [ ] Provider integrations (OpenAI, Anthropic, etc.)
