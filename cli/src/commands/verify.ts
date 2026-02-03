@@ -112,8 +112,8 @@ export async function verify(identityHash: string, options: VerifyOptions): Prom
       console.log(chalk.dim('  • The identity hash is incorrect'));
       console.log(chalk.dim('  • The agent was registered on a different network'));
       console.log();
-      console.log(chalk.dim('If you own this agent, anchor it with:'));
-      console.log(chalk.cyan('  npx agentidbase anchor ' + hash));
+      console.log(chalk.dim('If you own this agent, navigate to its directory and run:'));
+      console.log(chalk.cyan('  agentid anchor'));
       console.log();
     }
 

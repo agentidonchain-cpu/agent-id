@@ -1,140 +1,99 @@
 #!/usr/bin/env node
 /**
  * AgentID CLI
- * Register and verify AI agent identities on-chain
+ *
+ * Cartório, não incubadora.
+ * Registra existência, não cria agentes.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { init } from './commands/init.js';
-import { register } from './commands/register.js';
-import { attest } from './commands/attest.js';
-import { define } from './commands/define.js';
-import { self } from './commands/self.js';
+import { fingerprint } from './commands/fingerprint.js';
 import { anchor } from './commands/anchor.js';
 import { verify } from './commands/verify.js';
-import { proof } from './commands/proof.js';
 import { qr } from './commands/qr.js';
 import { verifyTwitter } from './commands/verify-twitter.js';
 
-// Default contract address (Base Mainnet)
-const DEFAULT_CONTRACT = '0x471C4c43672be2d49A2ceC79203c23b7194A22Fa';
+const CONTRACT = '0x471C4c43672be2d49A2ceC79203c23b7194A22Fa';
 
 const program = new Command();
 
 program
-  .name('agentidbase')
-  .description(`
-${chalk.bold.green('AgentID')} - Identidade Criptográfica para Agentes de IA
+  .name('agentid')
+  .description(`${chalk.bold.green('AgentID')} — Cryptographic identity for AI agents
 
-Registre seu agente na blockchain Base com verificação on-chain.
-${chalk.bold.green('✓ GRÁTIS:')} Nós pagamos todas as taxas de gas!
+${chalk.dim('Contract:')} ${CONTRACT}
+${chalk.dim('Website:')}  https://id-agent.org`)
+  .version('0.2.0');
 
-${chalk.bold.yellow('═══ COMO USAR (3 PASSOS) ═══')}
-
-  ${chalk.bold('1.')} ${chalk.cyan('npx agentidbase register')}        Registra + ancora on-chain ${chalk.green('(GRÁTIS)')}
-  ${chalk.bold('2.')} ${chalk.cyan('npx agentidbase verify-twitter')}  Vincula Twitter ${chalk.dim('(opcional)')}
-  ${chalk.bold('3.')} ${chalk.cyan('npx agentidbase verify <hash>')}   Verifica na blockchain
-
-${chalk.bold.yellow('═══ TODOS OS COMANDOS ═══')}
-
-  ${chalk.cyan('init')}              Cria arquivo agent.json
-  ${chalk.cyan('register')}          Registra agente com config ${chalk.dim('(requer wallet)')}
-  ${chalk.cyan('attest')}            Atesta agente de plataforma fechada ${chalk.dim('(ChatGPT, etc.)')}
-  ${chalk.cyan('verify <hash>')}     Verifica identidade on-chain
-  ${chalk.cyan('verify-twitter')}    Vincula conta do Twitter
-  ${chalk.cyan('qr <hash>')}         Gera QR code de verificação
-  ${chalk.cyan('proof <hash>')}      Mostra comandos para verificar manualmente
-
-${chalk.bold('Website:')}  https://id-agent.org
-${chalk.bold('Twitter:')}  @agentidbase
-${chalk.bold('Contrato:')} ${DEFAULT_CONTRACT}
-`)
-  .version('0.1.6');
-
+// fingerprint - detect and generate hash
 program
-  .command('init')
-  .description('Create an agent.json configuration file in the current directory')
-  .option('-f, --force', 'Overwrite existing agent.json without asking')
-  .action(init);
+  .command('fingerprint')
+  .alias('fp')
+  .description('Detect and generate agent fingerprint from current directory')
+  .option('-q, --quiet', 'Output only the fingerprint hash')
+  .option('--json', 'Output as JSON')
+  .action(fingerprint);
 
+// anchor - register on-chain
 program
-  .command('register')
-  .description('Register a new agent and generate its identity hash')
-  .option('-c, --config <path>', 'Path to agent.json config file')
-  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
-  .option('--no-anchor', 'Skip blockchain anchoring (register only)')
-  .action(register);
-
-program
-  .command('attest')
-  .description('Create attestation for closed platform agents (ChatGPT, etc.) - DEFAULT')
-  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
-  .option('-p, --platform <name>', 'Platform name (chatgpt, character.ai, etc.)')
-  .option('-i, --id <identifier>', 'Agent URL or ID on the platform')
-  .option('-n, --name <name>', 'Agent name')
-  .action(attest);
-
-program
-  .command('define')
-  .description('Create fingerprint from agent config (for open/self-hosted agents)')
-  .option('-c, --config <path>', 'Path to agent.json config file')
-  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
-  .option('--store-config', 'Store full config for public verification')
-  .action(define);
-
-program
-  .command('self')
-  .description('Agent self-registers with Ed25519 keypair (autonomous agents)')
-  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
-  .option('-n, --name <name>', 'Agent name')
-  .option('-k, --keypair <path>', 'Path to keypair file (generates if not exists)')
-  .option('-e, --endpoint <url>', 'Agent endpoint URL')
-  .option('--no-pow', 'Skip proof of work')
-  .action(self);
-
-program
-  .command('anchor <identityHash>')
-  .description('Anchor an agent identity on Base Mainnet blockchain')
+  .command('anchor')
+  .description('Register fingerprint on-chain (recalculates automatically)')
+  .option('--local', 'Use local wallet instead of free API')
+  .option('--private-key <key>', 'Wallet private key (or AGENTID_PRIVATE_KEY env)')
   .option('--rpc <url>', 'Base RPC endpoint', 'https://mainnet.base.org')
-  .option('--contract <address>', 'AgentID contract address', DEFAULT_CONTRACT)
-  .option('--private-key <key>', 'Wallet private key (or set AGENTID_PRIVATE_KEY env var)')
+  .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
   .action(anchor);
 
+// verify - check on-chain
 program
-  .command('verify <identityHash>')
-  .description('Verify an agent identity directly on the blockchain')
+  .command('verify <hash>')
+  .description('Verify an identity on the blockchain')
   .option('--rpc <url>', 'Base RPC endpoint', 'https://mainnet.base.org')
-  .option('--contract <address>', 'AgentID contract address', DEFAULT_CONTRACT)
+  .option('--proof', 'Show manual verification commands')
   .action(verify);
 
+// twitter - link Twitter account
 program
-  .command('proof <identityHash>')
-  .description('Generate a cryptographic proof for an agent identity')
-  .option('--rpc <url>', 'Base RPC endpoint', 'https://mainnet.base.org')
-  .option('--contract <address>', 'AgentID contract address', DEFAULT_CONTRACT)
-  .action(proof);
-
-program
-  .command('qr <identityHash>')
-  .description('Generate a QR code for easy agent verification')
-  .option('-o, --output <filename>', 'Output filename (default: agent-{hash}.png)')
-  .option('-s, --size <pixels>', 'QR code size in pixels', '512')
-  .option('-d, --dir <directory>', 'Output directory', process.cwd())
-  .action(qr);
-
-// Verify Twitter subcommand
-const verifyCmd = program
-  .command('verify-twitter [handle]')
+  .command('twitter [handle]')
+  .alias('verify-twitter')
   .description('Link a Twitter account to your agent identity')
-  .option('--identity-hash <hash>', 'Agent identity hash (0x...)')
+  .option('--identity-hash <hash>', 'Agent identity hash')
   .option('--tweet-url <url>', 'Tweet URL (skip interactive prompt)')
   .option('--api <url>', 'AgentID API endpoint', 'https://agent007-api-production.up.railway.app')
   .action(verifyTwitter);
 
-// Show help if no command provided
-if (process.argv.length === 2) {
-  program.outputHelp();
-}
+// qr - generate QR code
+program
+  .command('qr <hash>')
+  .description('Generate a QR code for verification')
+  .option('-o, --output <filename>', 'Output filename')
+  .option('-s, --size <pixels>', 'QR code size', '512')
+  .action(qr);
+
+// Legacy aliases (hidden, for backwards compatibility)
+program
+  .command('register', { hidden: true })
+  .description('Deprecated: use fingerprint + anchor')
+  .action(() => {
+    console.log(chalk.yellow('`register` is deprecated.'));
+    console.log();
+    console.log(chalk.white('Use the new flow:'));
+    console.log(chalk.cyan('  agentid fingerprint'));
+    console.log(chalk.cyan('  agentid anchor'));
+    console.log();
+  });
+
+program
+  .command('init', { hidden: true })
+  .description('Deprecated: not needed')
+  .action(() => {
+    console.log(chalk.yellow('`init` is deprecated.'));
+    console.log();
+    console.log(chalk.white('AgentID auto-detects your agent configuration.'));
+    console.log(chalk.white('Just run:'));
+    console.log(chalk.cyan('  agentid fingerprint'));
+    console.log();
+  });
 
 program.parse();

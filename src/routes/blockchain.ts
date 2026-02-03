@@ -100,8 +100,107 @@ router.get(
 );
 
 /**
+ * POST /blockchain/anchor
+ * Public endpoint for free anchoring (CLI and website)
+ * AgentID pays gas for users
+ */
+router.post(
+  '/anchor',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const schema = z.object({
+        identityHash: z.string().min(64).max(66), // With or without 0x prefix
+      });
+
+      const parseResult = schema.safeParse(req.body);
+      if (!parseResult.success) {
+        throw new ValidationError('Invalid request body', parseResult.error.flatten());
+      }
+
+      let { identityHash } = parseResult.data;
+
+      // Normalize: remove 0x prefix if present
+      if (identityHash.startsWith('0x')) {
+        identityHash = identityHash.slice(2);
+      }
+
+      if (identityHash.length !== 64) {
+        throw new ValidationError('Invalid identity hash format - must be 64 hex characters');
+      }
+
+      // Check if already anchored
+      const blockchain = await getBlockchainService();
+      const existing = await blockchain.verifyIdentity(identityHash);
+
+      if (existing.exists) {
+        res.json({
+          success: false,
+          error: {
+            code: 'ALREADY_ANCHORED',
+            message: 'Identity already registered on-chain',
+          },
+          data: {
+            identityHash: `0x${identityHash}`,
+            anchoredAt: existing.anchoredAt
+              ? new Date(existing.anchoredAt * 1000).toISOString()
+              : undefined,
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      // Anchor on blockchain (AgentID pays gas)
+      const result = await blockchain.anchorIdentity(identityHash);
+
+      if (!result.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'ANCHOR_FAILED',
+            message: result.error,
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      logger.info({
+        identityHash,
+        txHash: result.transactionHash,
+        source: 'public_api',
+      }, 'Identity anchored via public API');
+
+      res.json({
+        success: true,
+        data: {
+          identityHash: `0x${identityHash}`,
+          transactionHash: result.transactionHash,
+          blockNumber: result.blockNumber,
+          gasUsed: result.gasUsed,
+          explorerUrl: result.explorerUrl,
+          anchoredAt: new Date().toISOString(),
+        },
+        meta: {
+          requestId: uuidv4(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+/**
  * POST /blockchain/anchor/:identityHash
- * Anchor an identity hash on-chain
+ * Anchor an identity hash on-chain (authenticated, requires DB entry)
  */
 router.post(
   '/anchor/:identityHash',

@@ -39,3 +39,4 @@ credentials.json
 secrets.json
 cli/agentid-keypair.json
 .credentials-backup
+.agentid/
