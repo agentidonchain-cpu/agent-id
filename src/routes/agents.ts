@@ -407,19 +407,84 @@ router.post(
         updatedAt: new Date().toISOString(),
       };
 
-      // Store identity
+      // =======================================================================
+      // ON-CHAIN FIRST: Anchor BEFORE saving to DB
+      // Registration = On-chain TX mined. No exceptions.
+      // =======================================================================
+
+      const blockchain = await getBlockchainService();
+      if (!blockchain.isWriteReady()) {
+        logger.error({ identityHash }, 'Blockchain service not ready - cannot register');
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'BLOCKCHAIN_UNAVAILABLE',
+            message: 'Blockchain service is not available. Registration requires on-chain anchoring.',
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      // Remove 0x prefix for anchoring
+      const hashWithoutPrefix = identityHash.startsWith('0x') ? identityHash.slice(2) : identityHash;
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', walletAddress },
+        'Anchoring identity on-chain (ON-CHAIN FIRST)'
+      );
+
+      const anchorResult = await blockchain.anchorIdentity(hashWithoutPrefix);
+
+      if (!anchorResult.success) {
+        logger.error(
+          { identityHash: identityHash.slice(0, 10) + '...', error: anchorResult.error },
+          'ON-CHAIN REGISTRATION FAILED - not saving to DB'
+        );
+        res.status(502).json({
+          success: false,
+          error: {
+            code: 'ONCHAIN_ANCHOR_FAILED',
+            message: `On-chain registration failed: ${anchorResult.error}. Agent NOT registered.`,
+            details: {
+              identityHash,
+              reason: anchorResult.error,
+            },
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', txHash: anchorResult.transactionHash },
+        'ON-CHAIN ANCHOR SUCCESS - now saving to DB'
+      );
+
+      // Only save to DB AFTER on-chain success
       const identity: StoredIdentity = {
         id: uuidv4(),
         identityHash,
-        creatorId: walletAddress, // Owner is the wallet that signed
-        status: IdentityStatus.VALIDATED, // Signature = validation
+        creatorId: walletAddress,
+        status: IdentityStatus.REGISTERED, // ON-CHAIN FIRST: Only REGISTERED after TX mined
         agentCore,
         metadata,
         createdAt: new Date(),
         validatedAt: new Date(),
-        ownerAddress: walletAddress, // Store owner address
-        signature, // Store signature
+        ownerAddress: walletAddress,
+        signature,
         signedAt: timestamp,
+        // Blockchain proof
+        blockchainTxHash: anchorResult.transactionHash,
+        blockchainBlockNumber: anchorResult.blockNumber,
+        blockchainChain: 'base',
+        chainId: 8453,
       };
 
       await getStorage().saveIdentity(identity);
@@ -428,36 +493,11 @@ router.post(
         {
           identityHash: identityHash.slice(0, 10) + '...',
           walletAddress,
-          storedConfig: storeConfig,
+          txHash: anchorResult.transactionHash,
+          blockNumber: anchorResult.blockNumber,
         },
-        'ConfigIdentity registered successfully'
+        'ConfigIdentity REGISTERED (on-chain confirmed)'
       );
-
-      // Auto-anchor on blockchain (free for users - we pay gas)
-      let anchorResult: { success: boolean; transactionHash?: string; explorerUrl?: string; error?: string } = { success: false };
-      try {
-        const blockchain = await getBlockchainService();
-        if (blockchain.isWriteReady()) {
-          // Remove 0x prefix for anchoring
-          const hashWithoutPrefix = identityHash.startsWith('0x') ? identityHash.slice(2) : identityHash;
-          anchorResult = await blockchain.anchorIdentity(hashWithoutPrefix);
-          if (anchorResult.success) {
-            logger.info(
-              { identityHash: identityHash.slice(0, 10) + '...', txHash: anchorResult.transactionHash },
-              'ConfigIdentity auto-anchored on-chain'
-            );
-          } else {
-            logger.warn(
-              { identityHash: identityHash.slice(0, 10) + '...', error: anchorResult.error },
-              'Failed to auto-anchor on-chain (will retry later)'
-            );
-          }
-        } else {
-          logger.warn('Blockchain service not ready for write operations - skipping auto-anchor');
-        }
-      } catch (anchorError) {
-        logger.warn({ error: anchorError }, 'Error during auto-anchoring (registration still successful)');
-      }
 
       // Emit WebSocket event for real-time updates
       try {
@@ -468,14 +508,12 @@ router.post(
           provider: config.model.provider,
           modelId: config.model.modelId,
         });
-        // Trigger stats update
         wsService.emitStatsUpdate();
       } catch (wsError) {
-        // WebSocket errors should not fail registration
         logger.warn({ error: wsError }, 'Failed to emit WebSocket event');
       }
 
-      // Return success response
+      // Return success - ONLY because TX is mined
       res.status(201).json({
         success: true,
         data: {
@@ -484,10 +522,13 @@ router.post(
           owner: walletAddress,
           registeredAt: new Date().toISOString(),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
-          status: 'validated',
-          anchored: anchorResult.success,
+          status: 'registered', // ON-CHAIN FIRST: "registered" = on-chain
+          // Blockchain proof
           transactionHash: anchorResult.transactionHash,
+          blockNumber: anchorResult.blockNumber,
           explorerUrl: anchorResult.explorerUrl,
+          chain: 'base',
+          chainId: 8453,
         },
         meta: {
           requestId: uuidv4(),
@@ -602,12 +643,72 @@ router.post(
         updatedAt: new Date().toISOString(),
       };
 
-      // Store identity
+      // =======================================================================
+      // ON-CHAIN FIRST: Anchor BEFORE saving to DB
+      // Registration = On-chain TX mined. No exceptions.
+      // =======================================================================
+
+      const blockchain = await getBlockchainService();
+      if (!blockchain.isWriteReady()) {
+        logger.error({ identityHash, platform }, 'Blockchain service not ready - cannot register attestation');
+        res.status(503).json({
+          success: false,
+          error: {
+            code: 'BLOCKCHAIN_UNAVAILABLE',
+            message: 'Blockchain service is not available. Registration requires on-chain anchoring.',
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      const hashWithoutPrefix = identityHash.startsWith('0x') ? identityHash.slice(2) : identityHash;
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', platform },
+        'Anchoring attestation on-chain (ON-CHAIN FIRST)'
+      );
+
+      const anchorResult = await blockchain.anchorIdentity(hashWithoutPrefix);
+
+      if (!anchorResult.success) {
+        logger.error(
+          { identityHash: identityHash.slice(0, 10) + '...', platform, error: anchorResult.error },
+          'ON-CHAIN REGISTRATION FAILED - attestation not saved'
+        );
+        res.status(502).json({
+          success: false,
+          error: {
+            code: 'ONCHAIN_ANCHOR_FAILED',
+            message: `On-chain registration failed: ${anchorResult.error}. Attestation NOT registered.`,
+            details: {
+              identityHash,
+              platform,
+              reason: anchorResult.error,
+            },
+          },
+          meta: {
+            requestId: uuidv4(),
+            timestamp: new Date().toISOString(),
+          },
+        });
+        return;
+      }
+
+      logger.info(
+        { identityHash: identityHash.slice(0, 10) + '...', txHash: anchorResult.transactionHash },
+        'ON-CHAIN ANCHOR SUCCESS - now saving attestation to DB'
+      );
+
+      // Only save to DB AFTER on-chain success
       const identity: StoredIdentity = {
         id: uuidv4(),
         identityHash,
         creatorId: walletAddress,
-        status: IdentityStatus.VALIDATED,
+        status: IdentityStatus.REGISTERED, // ON-CHAIN FIRST: Only REGISTERED after TX mined
         agentCore,
         metadata,
         createdAt: new Date(),
@@ -615,6 +716,11 @@ router.post(
         ownerAddress: walletAddress,
         signature,
         signedAt: timestamp,
+        // Blockchain proof
+        blockchainTxHash: anchorResult.transactionHash,
+        blockchainBlockNumber: anchorResult.blockNumber,
+        blockchainChain: 'base',
+        chainId: 8453,
       };
 
       await getStorage().saveIdentity(identity);
@@ -624,27 +730,10 @@ router.post(
           identityHash: identityHash.slice(0, 10) + '...',
           platform,
           walletAddress,
+          txHash: anchorResult.transactionHash,
         },
-        'AttestationIdentity registered successfully'
+        'AttestationIdentity REGISTERED (on-chain confirmed)'
       );
-
-      // Auto-anchor on blockchain (free for users - we pay gas)
-      let anchorResult: { success: boolean; transactionHash?: string; explorerUrl?: string; error?: string } = { success: false };
-      try {
-        const blockchain = await getBlockchainService();
-        if (blockchain.isWriteReady()) {
-          const hashWithoutPrefix = identityHash.startsWith('0x') ? identityHash.slice(2) : identityHash;
-          anchorResult = await blockchain.anchorIdentity(hashWithoutPrefix);
-          if (anchorResult.success) {
-            logger.info(
-              { identityHash: identityHash.slice(0, 10) + '...', txHash: anchorResult.transactionHash },
-              'AttestationIdentity auto-anchored on-chain'
-            );
-          }
-        }
-      } catch (anchorError) {
-        logger.warn({ error: anchorError }, 'Error during auto-anchoring attestation');
-      }
 
       // Emit WebSocket event for real-time updates
       try {
@@ -655,14 +744,12 @@ router.post(
           provider: platform,
           modelId: 'attestation',
         });
-        // Trigger stats update
         wsService.emitStatsUpdate();
       } catch (wsError) {
-        // WebSocket errors should not fail registration
         logger.warn({ error: wsError }, 'Failed to emit WebSocket event');
       }
 
-      // Return success response
+      // Return success - ONLY because TX is mined
       res.status(201).json({
         success: true,
         data: {
@@ -674,10 +761,13 @@ router.post(
           owner: walletAddress,
           registeredAt: new Date().toISOString(),
           verifyUrl: `https://id-agent.org/verify/${identityHash}`,
-          status: 'attested',
-          anchored: anchorResult.success,
+          status: 'registered', // ON-CHAIN FIRST: "registered" = on-chain
+          // Blockchain proof
           transactionHash: anchorResult.transactionHash,
+          blockNumber: anchorResult.blockNumber,
           explorerUrl: anchorResult.explorerUrl,
+          chain: 'base',
+          chainId: 8453,
           note: 'This is an attestation, not a verified configuration.',
         },
         meta: {

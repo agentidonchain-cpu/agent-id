@@ -78,6 +78,22 @@ export interface StoredIdentity {
   verifications?: {
     twitter?: TwitterVerificationData;
   };
+  // ==========================================================================
+  // ON-CHAIN FIRST: Blockchain proof fields
+  // These are REQUIRED for status='registered'. Without them, agent is 'draft'.
+  // ==========================================================================
+  /** Transaction hash of the on-chain registration */
+  blockchainTxHash?: string;
+  /** Block number where TX was mined - REQUIRED for 'registered' status */
+  blockchainBlockNumber?: number;
+  /** Chain name (e.g., 'base', 'ethereum') */
+  blockchainChain?: string;
+  /** Chain ID (e.g., 8453 for Base mainnet) */
+  chainId?: number;
+  /** Registry contract address */
+  registryAddress?: string;
+  /** Timestamp when anchored on-chain */
+  blockchainAnchoredAt?: Date;
 }
 
 // =============================================================================

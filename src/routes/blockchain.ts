@@ -67,22 +67,22 @@ router.get(
       res.json({
         success: true,
         data: {
-          // On-chain counts (source of truth for anchored)
+          // ON-CHAIN FIRST: Only on-chain counts are "registered"
           onChain: {
-            totalAnchored: status.totalAnchored || 0,
+            totalRegistered: status.totalAnchored || 0,
             totalRevoked: status.totalRevoked || 0,
             totalActive: (status.totalAnchored || 0) - (status.totalRevoked || 0),
           },
-          // Off-chain counts (includes pending/validating)
+          // Off-chain counts (drafts, not registered)
           offChain: {
-            totalIdentities: dbStats?.identities || 0,
-            totalValidated: validatedCount,
+            totalDrafts: dbStats?.identities || 0,
             totalPending: pendingCount,
             byStatus: dbStats?.byStatus || {},
+            note: 'Off-chain entries are drafts, not registered agents',
           },
-          // Combined for display (website counter)
+          // Combined for display (website counter) - ON-CHAIN ONLY
           display: {
-            totalAgents: status.totalAnchored || validatedCount || 0,
+            totalAgents: status.totalAnchored || 0, // Only on-chain counts
             chain: status.chainName,
             contractAddress: status.contractAddress,
           },

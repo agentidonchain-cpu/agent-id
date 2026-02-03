@@ -1,123 +1,267 @@
 /**
  * OpenClaw Agent ID - Registry
  *
- * Simple storage for registered Agent IDs.
+ * ON-CHAIN FIRST: "Registered" = on-chain TX mined. Nothing else.
  *
- * Stores ONLY:
- * - type: "openclaw"
- * - fingerprint: bytes32
- * - schema: "openclaw-manifest-v1"
- * - created_at: timestamp
- * - manifest_ref (optional): IPFS/URL reference
+ * This registry serves as a LOCAL CACHE only:
+ * - Caches manifest data for convenience
+ * - Tracks which fingerprints are registered on-chain
+ * - Does NOT replace blockchain as source of truth
  *
- * Does NOT store:
- * - Owner
- * - Wallet
- * - Signature
- * - Auth data
- * - Permissions
+ * Two types of entries:
+ * 1. CACHED: Manifest prepared but NOT registered (no blockchain proof)
+ * 2. REGISTERED: On-chain TX mined (has transactionHash + blockNumber)
  */
 
 import type { OpenClawAgentId, OpenClawManifest } from './types.js';
 import { fingerprint } from './fingerprint.js';
-import { validateManifest } from './canonical.js';
+import { validateManifest, canonicalize } from './canonical.js';
 import { logger } from '../utils/logger.js';
 
 // =============================================================================
-// IN-MEMORY REGISTRY (can be replaced with DB)
+// TYPES
 // =============================================================================
 
-const registry = new Map<string, OpenClawAgentId>();
+interface CachedEntry {
+  type: 'cached';
+  fingerprint: string;
+  manifest?: OpenClawManifest;
+  manifestRef?: string;
+  cachedAt: string;
+}
+
+interface RegisteredEntry {
+  type: 'registered';
+  fingerprint: string;
+  manifest?: OpenClawManifest;
+  manifestRef?: string;
+  cachedAt: string;
+  // ON-CHAIN PROOF (required for 'registered')
+  transactionHash: string;
+  blockNumber: number;
+  registeredAt: string;
+}
+
+type RegistryEntry = CachedEntry | RegisteredEntry;
 
 // =============================================================================
-// REGISTRY OPERATIONS
+// IN-MEMORY REGISTRY
+// =============================================================================
+
+const registry = new Map<string, RegistryEntry>();
+
+// =============================================================================
+// CACHE OPERATIONS (NOT registration)
 // =============================================================================
 
 /**
- * Register a new Agent ID from a manifest.
- *
- * NO wallet required.
- * NO signature required.
- * NO auth required.
- *
- * @param manifest - The manifest to register
- * @param manifestRef - Optional reference to full manifest (IPFS, URL)
- * @returns The registered Agent ID
+ * Cache a manifest for later registration.
+ * This does NOT register anything - just stores locally.
  */
-export function register(
+export function cache(
   manifest: OpenClawManifest,
   manifestRef?: string
-): { agentId: OpenClawAgentId; created: boolean } {
+): { fingerprint: string; cached: boolean } {
   // Validate manifest
   const validation = validateManifest(manifest);
   if (!validation.valid) {
     throw new Error(`Invalid manifest: ${validation.errors.join(', ')}`);
   }
 
-  // Generate fingerprint
   const fp = fingerprint(manifest);
 
-  // Check if already registered (IDEMPOTENT)
-  if (registry.has(fp)) {
-    logger.info({ fingerprint: fp }, 'Agent ID already registered (returning existing)');
-    return { agentId: registry.get(fp)!, created: false };
+  // If already registered, don't overwrite
+  const existing = registry.get(fp);
+  if (existing?.type === 'registered') {
+    logger.debug({ fingerprint: fp }, 'Manifest already registered, not caching');
+    return { fingerprint: fp, cached: false };
   }
 
-  // Create Agent ID
+  // Cache (not registered!)
+  const entry: CachedEntry = {
+    type: 'cached',
+    fingerprint: fp,
+    manifest,
+    manifestRef,
+    cachedAt: new Date().toISOString(),
+  };
+
+  registry.set(fp, entry);
+  logger.debug({ fingerprint: fp }, 'Manifest cached (NOT registered)');
+
+  return { fingerprint: fp, cached: true };
+}
+
+// =============================================================================
+// REGISTRATION OPERATIONS (requires blockchain proof)
+// =============================================================================
+
+/**
+ * Mark a fingerprint as registered on-chain.
+ * Call this ONLY after TX is mined.
+ */
+export function markRegistered(
+  fp: string,
+  proof: {
+    transactionHash?: string;
+    blockNumber?: number;
+    manifest?: OpenClawManifest;
+    manifestRef?: string;
+  }
+): void {
+  const normalized = fp.toLowerCase();
+  const existing = registry.get(normalized);
+
+  const entry: RegisteredEntry = {
+    type: 'registered',
+    fingerprint: normalized,
+    manifest: proof.manifest || existing?.manifest,
+    manifestRef: proof.manifestRef || existing?.manifestRef,
+    cachedAt: existing?.cachedAt || new Date().toISOString(),
+    transactionHash: proof.transactionHash || 'unknown',
+    blockNumber: proof.blockNumber || 0,
+    registeredAt: new Date().toISOString(),
+  };
+
+  registry.set(normalized, entry);
+  logger.info(
+    { fingerprint: fp, txHash: proof.transactionHash },
+    'Manifest marked as REGISTERED (on-chain)'
+  );
+}
+
+/**
+ * Legacy register function - now requires on-chain proof.
+ * @deprecated Use cache() + markRegistered() instead
+ */
+export function register(
+  manifest: OpenClawManifest,
+  manifestRef?: string
+): { agentId: OpenClawAgentId; created: boolean } {
+  // Just cache, don't mark as registered
+  const { fingerprint: fp } = cache(manifest, manifestRef);
+  const existing = registry.get(fp);
+
+  // Return OpenClawAgentId format for backward compatibility
   const agentId: OpenClawAgentId = {
     type: 'openclaw',
     fingerprint: fp,
     schema: 'openclaw-manifest-v1',
-    created_at: new Date().toISOString(),
+    created_at: existing?.cachedAt || new Date().toISOString(),
     manifest_ref: manifestRef,
   };
 
-  // Store
-  registry.set(fp, agentId);
-
-  logger.info({ fingerprint: fp }, 'Agent ID registered (new)');
+  // IMPORTANT: This does NOT mean it's registered on-chain!
+  logger.warn(
+    { fingerprint: fp },
+    'Legacy register() called - manifest cached but NOT on-chain registered'
+  );
 
   return { agentId, created: true };
 }
 
+// =============================================================================
+// READ OPERATIONS
+// =============================================================================
+
 /**
  * Get a registered Agent ID by fingerprint.
- *
- * @param fp - The fingerprint to look up
- * @returns The Agent ID if found, null otherwise
+ * Returns null if not found or not registered on-chain.
  */
-export function get(fp: string): OpenClawAgentId | null {
+export function get(fp: string): (OpenClawAgentId & { onChain?: boolean }) | null {
   const normalized = fp.toLowerCase();
-  return registry.get(normalized) || null;
+  const entry = registry.get(normalized);
+
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    type: 'openclaw',
+    fingerprint: entry.fingerprint,
+    schema: 'openclaw-manifest-v1',
+    created_at: entry.cachedAt,
+    manifest_ref: entry.manifestRef,
+    // Additional fields
+    manifest: entry.manifest,
+    onChain: entry.type === 'registered',
+    transactionHash: entry.type === 'registered' ? entry.transactionHash : undefined,
+    blockNumber: entry.type === 'registered' ? entry.blockNumber : undefined,
+  } as OpenClawAgentId & { onChain?: boolean };
 }
 
 /**
- * Check if a fingerprint is registered.
- *
- * @param fp - The fingerprint to check
- * @returns true if registered
+ * Check if a fingerprint exists in cache (may or may not be on-chain).
  */
 export function exists(fp: string): boolean {
   return registry.has(fp.toLowerCase());
 }
 
 /**
- * List all registered Agent IDs.
- *
- * @param limit - Max number to return (default 100)
- * @param offset - Offset for pagination (default 0)
- * @returns Array of Agent IDs
+ * Check if a fingerprint is registered ON-CHAIN.
+ */
+export function isRegistered(fp: string): boolean {
+  const entry = registry.get(fp.toLowerCase());
+  return entry?.type === 'registered';
+}
+
+/**
+ * List all entries (cached + registered).
+ * @deprecated Use listRegistered() for on-chain only
  */
 export function list(limit = 100, offset = 0): OpenClawAgentId[] {
-  const all = Array.from(registry.values());
+  const all = Array.from(registry.values()).map(entry => ({
+    type: 'openclaw' as const,
+    fingerprint: entry.fingerprint,
+    schema: 'openclaw-manifest-v1' as const,
+    created_at: entry.cachedAt,
+    manifest_ref: entry.manifestRef,
+  }));
   return all.slice(offset, offset + limit);
 }
 
 /**
- * Get total count of registered Agent IDs.
+ * List only ON-CHAIN registered agents.
+ * ON-CHAIN FIRST: This is the correct function to use.
+ */
+export function listRegistered(limit = 100, offset = 0): Array<{
+  fingerprint: string;
+  transactionHash: string;
+  blockNumber: number;
+  registeredAt: string;
+  agentName?: string;
+  manifestRef?: string;
+}> {
+  const registered = Array.from(registry.values())
+    .filter((entry): entry is RegisteredEntry => entry.type === 'registered')
+    .map(entry => ({
+      fingerprint: entry.fingerprint,
+      transactionHash: entry.transactionHash,
+      blockNumber: entry.blockNumber,
+      registeredAt: entry.registeredAt,
+      agentName: entry.manifest?.agent_name,
+      manifestRef: entry.manifestRef,
+    }));
+
+  return registered.slice(offset, offset + limit);
+}
+
+/**
+ * Get total count (cached + registered).
+ * @deprecated Use countRegistered() for on-chain only
  */
 export function count(): number {
   return registry.size;
+}
+
+/**
+ * Get count of ON-CHAIN registered agents only.
+ * ON-CHAIN FIRST: This is the correct function to use.
+ */
+export function countRegistered(): number {
+  return Array.from(registry.values())
+    .filter(entry => entry.type === 'registered')
+    .length;
 }
 
 // =============================================================================
@@ -125,11 +269,20 @@ export function count(): number {
 // =============================================================================
 
 export const openclawRegistry = {
+  // Cache operations (NOT registration)
+  cache,
+  // Registration operations (requires blockchain proof)
+  markRegistered,
+  isRegistered,
+  // Legacy (deprecated)
   register,
+  // Read operations
   get,
   exists,
   list,
+  listRegistered,
   count,
+  countRegistered,
 };
 
 export default openclawRegistry;

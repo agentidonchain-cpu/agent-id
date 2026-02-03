@@ -19,13 +19,38 @@ export enum ModelProvider {
   CUSTOM = 'custom',
 }
 
+/**
+ * Identity Status - ON-CHAIN FIRST Model
+ *
+ * CRITICAL: "REGISTERED" means on-chain TX mined. Nothing else.
+ *
+ * - DRAFT: Off-chain only, not yet submitted to blockchain
+ * - TX_SUBMITTED: TX broadcast, waiting for confirmation (has txHash)
+ * - REGISTERED: On-chain, TX mined (has blockNumber) - THE ONLY "REAL" REGISTRATION
+ * - SUSPENDED: Temporarily disabled (can be on-chain or off-chain)
+ * - REVOKED: Permanently invalidated
+ */
 export enum IdentityStatus {
-  PENDING = 'pending',
-  VALIDATING = 'validating',
-  VALIDATED = 'validated',
+  /** Off-chain only - prepared but not submitted to blockchain */
+  DRAFT = 'draft',
+  /** TX broadcast, waiting for mining (has txHash, no blockNumber yet) */
+  TX_SUBMITTED = 'tx_submitted',
+  /** ON-CHAIN REGISTERED - TX mined, has blockNumber. THE ONLY TRUE REGISTRATION. */
+  REGISTERED = 'registered',
+  /** Temporarily suspended */
   SUSPENDED = 'suspended',
+  /** Permanently revoked */
   REVOKED = 'revoked',
-  ARCHIVED = 'archived',
+
+  // Legacy aliases for backward compatibility during migration
+  /** @deprecated Use DRAFT instead */
+  PENDING = 'draft',
+  /** @deprecated Use DRAFT instead */
+  VALIDATING = 'draft',
+  /** @deprecated Use REGISTERED instead (only if on-chain) or DRAFT (if off-chain) */
+  VALIDATED = 'draft',
+  /** @deprecated No longer used */
+  ARCHIVED = 'draft',
 }
 
 export enum AttestationType {

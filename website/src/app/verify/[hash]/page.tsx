@@ -20,11 +20,18 @@ interface TwitterVerification {
   proofUrl: string;
 }
 
+/**
+ * Agent Data
+ *
+ * ON-CHAIN FIRST: status is either 'registered' (on-chain) or 'not_found'.
+ * There is no intermediate "api_only" or "pending" state.
+ */
 interface AgentData {
   identityHash: string;
   creator: string;
   timestamp: number;
-  status: 'verified' | 'pending' | 'not_found' | 'api_only';
+  // ON-CHAIN FIRST: Only 'registered' (on-chain confirmed) or 'not_found'
+  status: 'registered' | 'not_found';
   // V2 fields
   agentName?: string;
   identityType?: string;
@@ -32,7 +39,7 @@ interface AgentData {
   publicReference?: string;
   trustScore?: number;
   trustDescription?: string;
-  // On-chain fields
+  // On-chain fields (REQUIRED for 'registered' status)
   txHash?: string;
   blockNumber?: number;
   // Twitter verification
@@ -75,47 +82,61 @@ export default function VerifyPage() {
               console.log('No Twitter verification found');
             }
 
-            setAgent({
-              identityHash: hash,
-              creator: d.anchor?.txHash ? 'On-chain' : 'API Registered',
-              timestamp: new Date(d.createdAt).getTime() / 1000,
-              status: d.anchor ? 'verified' : 'api_only',
-              agentName: d.agentName,
-              identityType: d.identityType,
-              platform: d.platform,
-              publicReference: d.publicReference,
-              trustScore: d.trustScore,
-              trustDescription: d.trustDescription,
-              txHash: d.anchor?.txHash,
-              blockNumber: d.anchor?.blockNumber,
-              twitter,
-            });
-            setLoading(false);
-            return;
+            // ON-CHAIN FIRST: Only show as registered if there's blockchain proof
+            if (!d.anchor?.txHash || !d.anchor?.blockNumber) {
+              // No on-chain proof - treat as not found
+              console.log('Agent found in API but not on-chain - treating as not found');
+              // Continue to blockchain fallback
+            } else {
+              setAgent({
+                identityHash: hash,
+                creator: d.anchor.txHash ? 'On-chain' : 'Unknown',
+                timestamp: new Date(d.createdAt).getTime() / 1000,
+                status: 'registered', // ON-CHAIN FIRST: Only 'registered' if on-chain
+                agentName: d.agentName,
+                identityType: d.identityType,
+                platform: d.platform,
+                publicReference: d.publicReference,
+                trustScore: d.trustScore,
+                trustDescription: d.trustDescription,
+                txHash: d.anchor.txHash,
+                blockNumber: d.anchor.blockNumber,
+                twitter,
+              });
+              setLoading(false);
+              return;
+            }
           }
         }
       } catch (error) {
         console.error('API fetch failed, trying blockchain:', error);
       }
 
-      // Fallback: Try V1 API
+      // Fallback: Try V1 API (ON-CHAIN FIRST: only accept if has blockchain proof)
       try {
         const v1Response = await fetch(`${API_URL}/api/v1/agents/${hash}`);
         if (v1Response.ok) {
           const v1Data = await v1Response.json();
           if (v1Data.success && v1Data.data) {
             const d = v1Data.data;
-            setAgent({
-              identityHash: hash,
-              creator: d.ownerAddress || d.walletAddress || 'Unknown',
-              timestamp: new Date(d.createdAt).getTime() / 1000,
-              status: d.blockchainTxHash ? 'verified' : 'api_only',
-              agentName: d.displayName || d.config?.name,
-              identityType: d.identityType || 'config',
-              trustScore: d.trustScore,
-            });
-            setLoading(false);
-            return;
+            // ON-CHAIN FIRST: Only show if on-chain
+            if (d.blockchainTxHash) {
+              setAgent({
+                identityHash: hash,
+                creator: d.ownerAddress || d.walletAddress || 'Unknown',
+                timestamp: new Date(d.createdAt).getTime() / 1000,
+                status: 'registered',
+                agentName: d.displayName || d.config?.name,
+                identityType: d.identityType || 'config',
+                trustScore: d.trustScore,
+                txHash: d.blockchainTxHash,
+                blockNumber: d.blockchainBlockNumber,
+              });
+              setLoading(false);
+              return;
+            }
+            // No blockchain proof - continue to blockchain fallback
+            console.log('V1 API found agent but no blockchain proof - checking chain directly');
           }
         }
       } catch (error) {
@@ -159,11 +180,12 @@ export default function VerifyPage() {
         const revokedAt = parseInt(hex.slice(192, 256), 16);
         const isValid = parseInt(hex.slice(256, 320), 16) === 1;
 
+        // ON-CHAIN FIRST: If on-chain and valid, it's registered
         setAgent({
           identityHash: hash,
           creator: creator,
           timestamp: anchoredAt,
-          status: isValid ? 'verified' : (revokedAt > 0 ? 'not_found' : 'pending')
+          status: isValid ? 'registered' : 'not_found'
         });
       } catch (error) {
         console.error('Error fetching agent data:', error);
@@ -229,17 +251,14 @@ export default function VerifyPage() {
           <h1 className="text-3xl font-bold mb-4 text-green-300">{agent.agentName}</h1>
         )}
 
-        {/* Status Badge */}
+        {/* Status Badge - ON-CHAIN FIRST: Only registered (green) or not_found (red) */}
         <div className="mb-8 flex flex-wrap gap-2">
           <div className={`inline-block px-4 py-2 border-2 rounded-lg font-bold ${
-            agent.status === 'verified'
+            agent.status === 'registered'
               ? 'bg-green-500/20 text-green-300 border-green-500'
-              : agent.status === 'api_only'
-              ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500'
               : 'bg-red-500/20 text-red-300 border-red-500'
           }`}>
-            {agent.status === 'verified' ? 'VERIFIED ON-CHAIN' :
-             agent.status === 'api_only' ? 'REGISTERED (not yet on-chain)' : 'NOT VERIFIED'}
+            {agent.status === 'registered' ? 'REGISTERED ON-CHAIN' : 'NOT REGISTERED'}
           </div>
 
           {agent.identityType && (

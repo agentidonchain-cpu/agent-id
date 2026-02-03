@@ -176,45 +176,55 @@ export async function register(options: RegisterOptions): Promise<void> {
       message: signatureResult.message,
       storeConfig: options.storeConfig,
     });
-    registerSpinner.succeed('Agent registered with AgentID');
 
-    // Show anchor status from registration response
-    if (result.anchored) {
+    // =========================================================================
+    // ON-CHAIN FIRST: Registration = TX mined. No exceptions.
+    // The API now returns error if anchoring fails, so if we get here, it worked.
+    // =========================================================================
+
+    if (!result.transactionHash || !result.blockNumber) {
+      // This should not happen with the new API, but handle it just in case
+      registerSpinner.fail('Registration incomplete - no blockchain confirmation');
       console.log();
-      console.log(chalk.dim('─'.repeat(60)));
+      console.log(chalk.red('ERROR: On-chain anchoring did not complete.'));
+      console.log(chalk.red('Your agent is NOT registered.'));
       console.log();
-      console.log(chalk.bold.cyan('STEP 5: ON-CHAIN ANCHORING'));
-      console.log(chalk.dim('Recording identity on Base Mainnet (free - we pay the gas)...'));
+      console.log(chalk.dim('The API did not return blockchain proof (txHash + blockNumber).'));
+      console.log(chalk.dim('Please try again or contact support.'));
       console.log();
-      console.log(chalk.green('✓ Successfully anchored on Base Mainnet!'));
-      if (result.transactionHash) {
-        console.log();
-        console.log(chalk.dim('Transaction: ') + chalk.cyan(`https://basescan.org/tx/${result.transactionHash}`));
-      }
-    } else if (options.anchor) {
-      console.log();
-      console.log(chalk.dim('─'.repeat(60)));
-      console.log();
-      console.log(chalk.yellow('⚠ On-chain anchoring pending'));
-      console.log(chalk.dim('Your identity will be anchored on-chain shortly.'));
-      console.log(chalk.dim('Use the verify command to check status:'));
-      console.log(chalk.cyan(`  npx agentidbase verify 0x${identityHash}`));
+      process.exit(1);
     }
+
+    registerSpinner.succeed('Agent REGISTERED on-chain');
+
+    // Show blockchain proof
+    console.log();
+    console.log(chalk.dim('─'.repeat(60)));
+    console.log();
+    console.log(chalk.bold.cyan('STEP 5: ON-CHAIN REGISTRATION'));
+    console.log(chalk.dim('Identity recorded on Base Mainnet (free - we pay the gas)'));
+    console.log();
+    console.log(chalk.green('✓ REGISTERED ON-CHAIN'));
+    console.log();
+    console.log(chalk.dim('  Transaction: ') + chalk.cyan(`https://basescan.org/tx/${result.transactionHash}`));
+    console.log(chalk.dim('  Block:       ') + chalk.white(`#${result.blockNumber}`));
 
     // Final output
     console.log();
     console.log(chalk.dim('─'.repeat(60)));
     console.log();
     console.log(chalk.bold.green('╔════════════════════════════════════════════════════════════╗'));
-    console.log(chalk.bold.green('║') + chalk.bold.green('              ✓ REGISTRATION COMPLETE                      ') + chalk.bold.green('║'));
+    console.log(chalk.bold.green('║') + chalk.bold.green('           ✓ REGISTERED ON-CHAIN                           ') + chalk.bold.green('║'));
     console.log(chalk.bold.green('╚════════════════════════════════════════════════════════════╝'));
     console.log();
     console.log(chalk.bold('Summary:'));
     console.log(chalk.dim('  Identity Hash: ') + chalk.cyan(`0x${identityHash}`));
     console.log(chalk.dim('  Owner:         ') + chalk.white(signatureResult.walletAddress));
-    console.log(chalk.dim('  Type:          ') + chalk.green('CONFIG (verified)'));
-    console.log(chalk.dim('  Status:        ') + chalk.green('Signed & Anchored'));
+    console.log(chalk.dim('  Type:          ') + chalk.green('CONFIG'));
+    console.log(chalk.dim('  Status:        ') + chalk.bold.green('REGISTERED (on-chain)'));
     console.log(chalk.dim('  Chain:         ') + chalk.white('Base Mainnet (8453)'));
+    console.log(chalk.dim('  TX Hash:       ') + chalk.cyan(result.transactionHash.slice(0, 18) + '...'));
+    console.log(chalk.dim('  Block:         ') + chalk.white(`#${result.blockNumber}`));
     console.log(chalk.dim('  Cost:          ') + chalk.green('FREE (gas paid by AgentID)'));
     console.log();
     console.log(chalk.dim('─'.repeat(60)));
@@ -235,14 +245,21 @@ export async function register(options: RegisterOptions): Promise<void> {
     console.log();
 
   } catch (error: any) {
-    registerSpinner.fail('Registration failed');
+    registerSpinner.fail('Registration FAILED');
+    console.log();
+    console.log(chalk.bold.red('╔════════════════════════════════════════════════════════════╗'));
+    console.log(chalk.bold.red('║') + chalk.bold.red('              ✗ NOT REGISTERED                              ') + chalk.bold.red('║'));
+    console.log(chalk.bold.red('╚════════════════════════════════════════════════════════════╝'));
     console.log();
     console.log(chalk.red('Error: ' + error.message));
+    console.log();
+    console.log(chalk.dim('Your agent is NOT registered. The on-chain transaction failed.'));
     console.log();
     console.log(chalk.dim('Troubleshooting:'));
     console.log(chalk.dim('  • Check your internet connection'));
     console.log(chalk.dim('  • Verify the API endpoint is correct'));
     console.log(chalk.dim('  • Ensure your config file is valid JSON'));
+    console.log(chalk.dim('  • Try again - blockchain may be congested'));
     console.log();
     process.exit(1);
   }
@@ -425,8 +442,14 @@ async function registerWithAPI(
     message: string;
     storeConfig?: boolean;
   }
-): Promise<{ registrationId: string; anchored?: boolean; transactionHash?: string }> {
+): Promise<{
+  registrationId: string;
+  transactionHash?: string;
+  blockNumber?: number;
+  status?: string;
+}> {
   // Use the new V1 config registration endpoint
+  // ON-CHAIN FIRST: This API now fails if anchoring fails
   const response = await fetch(`${apiUrl}/api/v1/agents/register/config`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -448,14 +471,19 @@ async function registerWithAPI(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'Registration failed' }));
-    throw new Error(error.message || error.error?.message || 'Registration failed');
+    // Extract detailed error message
+    const errorMessage = error.error?.message || error.message || 'Registration failed';
+    throw new Error(errorMessage);
   }
 
   const data = await response.json();
+
+  // ON-CHAIN FIRST: API now returns blockNumber as proof of on-chain registration
   return {
     registrationId: data.data?.identityHash || signatureData.identityHash,
-    anchored: data.data?.anchored,
     transactionHash: data.data?.transactionHash,
+    blockNumber: data.data?.blockNumber,
+    status: data.data?.status,
   };
 }
 
