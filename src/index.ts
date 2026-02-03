@@ -22,6 +22,7 @@ import blockchainRoutes from './routes/blockchain.js';
 import sessionsRoutes from './routes/sessions.js';
 import verifyRoutes from './routes/verify.js';
 import runtimeRoutes from './routes/runtime.js';
+import { openclawRoutes } from './openclaw/index.js';
 import { initializeDatabase, shutdownDatabase, verifySchema } from './config/init-db.js';
 import { getHealth as getDatabaseHealth, query } from './config/database.js';
 import { getWebSocketService, resetWebSocketService } from './services/realtime/websocket.js';
@@ -241,6 +242,9 @@ app.use('/api/v1/verify', verifyRoutes);
 
 // Runtime Attestation Protocol (RAP) routes
 app.use('/api/v1/runtime', runtimeRoutes);
+
+// OpenClaw Agent ID routes (NO auth required)
+app.use('/api/v1/openclaw', openclawRoutes);
 
 // =============================================================================
 // ERROR HANDLING
