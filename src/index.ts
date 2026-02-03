@@ -286,28 +286,9 @@ async function startServer() {
   const wsService = getWebSocketService();
   wsService.initialize(server);
 
-  // Set up real-time stats callback for website
-  if (databaseConnected) {
-    wsService.setStatsCallback(async () => {
-      try {
-        const [totalResult, anchoredResult] = await Promise.all([
-          query<{ count: string }>('SELECT COUNT(*) as count FROM agent_identities'),
-          query<{ count: string }>('SELECT COUNT(*) as count FROM agent_identities WHERE blockchain_tx_hash IS NOT NULL'),
-        ]);
-
-        return {
-          totalAgents: parseInt(totalResult.rows[0]?.count || '0'),
-          totalAnchored: parseInt(anchoredResult.rows[0]?.count || '0'),
-        };
-      } catch (error) {
-        logger.error({ error }, 'Failed to fetch stats for WebSocket');
-        return { totalAgents: 0, totalAnchored: 0 };
-      }
-    });
-
-    // Start broadcasting stats every 5 seconds
-    wsService.startStatsInterval(5000);
-  }
+  // ON-CHAIN FIRST: Stats come from blockchain, not DB
+  // Frontend polls RPC directly - no WebSocket stats needed
+  // "If the number changes without a transaction, the counter is lying."
 
   server.listen(Number(PORT), HOST, () => {
     logger.info({

@@ -52,7 +52,7 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [stats.anchored]);
 
-  // WebSocket connection
+  // WebSocket connection (for live feed only, NOT for stats)
   const connectWebSocket = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -62,8 +62,7 @@ export default function Home() {
 
       ws.onopen = () => {
         setIsLive(true);
-        // Subscribe to stats and all channels
-        ws.send(JSON.stringify({ action: 'subscribe', channel: 'stats' }));
+        // Subscribe to agent events only (NOT stats - stats come from blockchain)
         ws.send(JSON.stringify({ action: 'subscribe', channel: 'all' }));
       };
 
@@ -71,18 +70,12 @@ export default function Home() {
         try {
           const message = JSON.parse(event.data);
 
-          if (message.type === 'stats.update') {
-            setStats({
-              anchored: message.data.totalAnchored || message.data.totalAgents || 0,
-              active: message.data.totalAgents || 0,
-            });
-            setLastUpdate(new Date());
-          }
-
-          if (message.type === 'agent.registered' || message.type === 'agent.anchored') {
+          // Live feed only - NO stats updates from WebSocket
+          // Stats must come from blockchain polling
+          if (message.type === 'agent.anchored') {
             const newAgent: AgentEvent = {
               id: message.data.identityHash + Date.now(),
-              type: message.type === 'agent.registered' ? 'registered' : 'anchored',
+              type: 'anchored',
               identityHash: message.data.identityHash,
               displayName: message.data.displayName || 'Unknown Agent',
               provider: message.data.provider,
@@ -90,14 +83,7 @@ export default function Home() {
             };
 
             setRecentAgents(prev => [newAgent, ...prev].slice(0, 10));
-
-            // Update stats immediately for new registrations
-            if (message.type === 'agent.registered') {
-              setStats(prev => ({ ...prev, active: prev.active + 1 }));
-            }
-            if (message.type === 'agent.anchored') {
-              setStats(prev => ({ ...prev, anchored: prev.anchored + 1 }));
-            }
+            // Do NOT increment stats here - wait for blockchain confirmation via polling
           }
         } catch (e) {
           // Ignore parse errors
@@ -120,27 +106,14 @@ export default function Home() {
     }
   }, []);
 
-  // Fetch initial stats from API (faster than blockchain)
+  // Fetch stats ONLY from blockchain (ON-CHAIN FIRST)
+  // "If the number changes without a transaction, the counter is lying."
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchStatsFromChain = async () => {
       try {
-        // Try V2 API first
-        const response = await fetch(`${API_URL}/api/v2/agents/stats`);
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
-            setStats({
-              anchored: result.data.totalAnchored || result.data.totalAgents || 0,
-              active: result.data.totalAgents || 0,
-            });
-            setLastUpdate(new Date());
-            return;
-          }
-        }
-
-        // Fallback to blockchain
-        const data = "0xc59d4847"; // getStats() selector
-        const rpcResponse = await fetch(RPC_URL, {
+        // getStats() selector - queries contract directly
+        const data = "0xc59d4847";
+        const response = await fetch(RPC_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -151,21 +124,22 @@ export default function Home() {
           }),
         });
 
-        const rpcResult = await rpcResponse.json();
-        if (rpcResult.result && rpcResult.result !== "0x") {
-          const hex = rpcResult.result.slice(2);
+        const result = await response.json();
+        if (result.result && result.result !== "0x") {
+          const hex = result.result.slice(2);
           const anchored = parseInt(hex.slice(0, 64), 16);
           const active = parseInt(hex.slice(128, 192), 16);
           setStats({ anchored, active });
           setLastUpdate(new Date());
         }
       } catch {
-        // API/RPC not available, keep current stats
+        // RPC not available, keep current stats
       }
     };
 
-    fetchStats();
-    const interval = setInterval(fetchStats, 30000);
+    fetchStatsFromChain();
+    // Poll every 30 seconds - slow but true
+    const interval = setInterval(fetchStatsFromChain, 30000);
     return () => clearInterval(interval);
   }, []);
 
