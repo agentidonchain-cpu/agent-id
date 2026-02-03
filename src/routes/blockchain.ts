@@ -12,6 +12,7 @@ import { getAgentStorageService } from '../services/storage/agent-storage.js';
 import { apiKeyAuth, type AuthenticatedRequest } from '../middleware/auth.js';
 import { ValidationError, NotFoundError } from '../middleware/errorHandler.js';
 import { logger } from '../utils/logger.js';
+import { IdentityStatus } from '../types/identity.js';
 
 // =============================================================================
 // ROUTER
@@ -121,8 +122,10 @@ router.post(
         throw new NotFoundError('Agent identity');
       }
 
-      if (identity.status !== 'validated') {
-        throw new ValidationError('Agent must be validated before anchoring');
+      // ON-CHAIN FIRST: Allow anchoring from 'draft' status
+      const statusStr = identity.status as string;
+      if (statusStr !== 'draft' && statusStr !== IdentityStatus.DRAFT) {
+        throw new ValidationError('Agent must be in draft status before anchoring');
       }
 
       // Anchor on blockchain
@@ -196,7 +199,9 @@ router.post(
 
       for (const hash of identityHashes) {
         const identity = await storage.getIdentity(hash);
-        if (identity && identity.status === 'validated') {
+        // ON-CHAIN FIRST: Allow anchoring from 'draft' status
+        const statusStr = identity?.status as string | undefined;
+        if (identity && (statusStr === 'draft' || statusStr === IdentityStatus.DRAFT)) {
           validHashes.push(hash);
         }
       }
@@ -491,8 +496,10 @@ router.post(
         throw new NotFoundError('Agent identity');
       }
 
-      if (identity.status !== 'validated') {
-        throw new ValidationError('Agent must be validated before anchoring');
+      // ON-CHAIN FIRST: Allow anchoring from 'draft' status
+      const statusStr = identity.status as string;
+      if (statusStr !== 'draft' && statusStr !== IdentityStatus.DRAFT) {
+        throw new ValidationError('Agent must be in draft status before anchoring');
       }
 
       // Convert UUID to bytes32 format
@@ -576,8 +583,10 @@ router.post(
         throw new NotFoundError('New agent identity');
       }
 
-      if (identity.status !== 'validated') {
-        throw new ValidationError('New identity must be validated before anchoring');
+      // ON-CHAIN FIRST: Allow anchoring from 'draft' status
+      const statusStr = identity.status as string;
+      if (statusStr !== 'draft' && statusStr !== IdentityStatus.DRAFT) {
+        throw new ValidationError('New identity must be in draft status before anchoring');
       }
 
       // Convert UUID to bytes32 format

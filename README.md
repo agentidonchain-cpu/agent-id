@@ -308,6 +308,9 @@ ENCRYPTION_MASTER_KEY=64-hex-chars
 BASE_RPC_URL=https://mainnet.base.org
 BASE_PRIVATE_KEY=your-private-key-for-anchoring
 
+# Twitter Verification (Optional)
+TWITTER_API_KEY=your-twitterapi.io-key
+
 # Optional
 PORT=3000
 HOST=0.0.0.0

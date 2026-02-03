@@ -170,17 +170,17 @@ export class AdminDashboardService {
    * Get system-wide statistics
    */
   getSystemStats(): SystemStats {
-    const agentsByStatus: Record<IdentityStatus, number> = {
-      [IdentityStatus.PENDING]: 0,
-      [IdentityStatus.VALIDATING]: 0,
-      [IdentityStatus.VALIDATED]: 0,
-      [IdentityStatus.SUSPENDED]: 0,
-      [IdentityStatus.REVOKED]: 0,
-      [IdentityStatus.ARCHIVED]: 0,
+    // ON-CHAIN FIRST status model
+    const agentsByStatus: Record<string, number> = {
+      draft: 0,
+      tx_submitted: 0,
+      registered: 0,
+      suspended: 0,
+      revoked: 0,
     };
 
     for (const identity of this.identities.values()) {
-      const status = identity.status as IdentityStatus;
+      const status = identity.status as string;
       if (status in agentsByStatus) {
         agentsByStatus[status]++;
       }

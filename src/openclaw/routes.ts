@@ -386,7 +386,7 @@ router.get('/:fingerprint', async (req: Request, res: Response, next: NextFuncti
         },
         // Cached manifest (if available)
         manifest: cachedData?.manifest || null,
-        manifestRef: cachedData?.manifestRef || null,
+        manifestRef: cachedData?.manifest_ref || null,
       },
       meta: {
         requestId: uuidv4(),

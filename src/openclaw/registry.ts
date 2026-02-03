@@ -164,11 +164,19 @@ export function register(
 // READ OPERATIONS
 // =============================================================================
 
+/** Extended Agent ID with cached data */
+export interface CachedAgentId extends OpenClawAgentId {
+  onChain?: boolean;
+  manifest?: OpenClawManifest;
+  transactionHash?: string;
+  blockNumber?: number;
+}
+
 /**
  * Get a registered Agent ID by fingerprint.
  * Returns null if not found or not registered on-chain.
  */
-export function get(fp: string): (OpenClawAgentId & { onChain?: boolean }) | null {
+export function get(fp: string): CachedAgentId | null {
   const normalized = fp.toLowerCase();
   const entry = registry.get(normalized);
 
@@ -187,7 +195,7 @@ export function get(fp: string): (OpenClawAgentId & { onChain?: boolean }) | nul
     onChain: entry.type === 'registered',
     transactionHash: entry.type === 'registered' ? entry.transactionHash : undefined,
     blockNumber: entry.type === 'registered' ? entry.blockNumber : undefined,
-  } as OpenClawAgentId & { onChain?: boolean };
+  };
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   ModelProvider,
   AttestationType,
   TrustLevel,
+  IdentityStatus,
 } from '../../types/identity.js';
 
 // =============================================================================
@@ -150,8 +151,10 @@ export class LLMProxyService {
       throw new Error('Agent identity not found');
     }
 
-    if (identity.status !== 'validated') {
-      throw new Error(`Agent is not validated (status: ${identity.status})`);
+    // ON-CHAIN FIRST: Only registered (on-chain) agents can use the proxy
+    const statusStr = identity.status as string;
+    if (statusStr !== 'registered' && statusStr !== IdentityStatus.REGISTERED) {
+      throw new Error(`Agent is not registered (status: ${identity.status})`);
     }
 
     const { agentCore } = identity;
